@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>任务价目与识别词</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f8f6f2;--card:#fff;--border:#e8e5e0;--text:#1e1e1e;--text2:#6f6b65;--text3:#a8a39b;
+  --blue:#5b5ea6;--blue-10:#f4f3fa;--green:#d4913e;--green-80:#b87a2c;--red:#d4645c;--red-10:#fef6f5;
+  --radius:14px;--radius-sm:9px;--shadow-sm:0 1px 2px rgba(0,0,0,.03);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+}
+body{background:var(--bg);min-height:100vh;font:14px/1.65 var(--font);color:var(--text);-webkit-font-smoothing:antialiased}
+.container{max-width:680px;margin:0 auto;padding:32px 20px 80px}
+
+/* ---- 头部 ---- */
+.top{display:flex;align-items:center;margin-bottom:24px;gap:12px}
+.top a{color:var(--text2);text-decoration:none;font-size:13px;font-weight:500;transition:color .15s;display:flex;align-items:center;gap:4px}
+.top a:hover{color:var(--blue)}
+.top h1{font-size:20px;font-weight:700;flex:1;text-align:center;letter-spacing:-.3px}
+
+/* ---- Tab 切换 ---- */
+.tabs{display:flex;gap:6px;margin-bottom:16px}
+.tab{padding:8px 20px;font:13px/1 var(--font);font-weight:600;color:var(--text2);background:var(--card);border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:all .15s}
+.tab:hover{color:var(--text);border-color:#d1cec9}
+.tab.active{color:#fff;background:var(--blue);border-color:var(--blue)}
+
+/* ---- 内容面板 ---- */
+.panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm)}
+
+/* ---- 表头 ---- */
+.table-head{display:flex;padding:12px 18px;background:var(--bg);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.5px}
+.table-head .col-grip{width:36px;flex-shrink:0}
+.table-head .col-k,.row .col-k{flex:1}
+.table-head .col-v,.row .col-v{flex:1}
+.table-head .col-act{width:48px;flex-shrink:0}
+
+/* ---- 数据行 ---- */
+.row{display:flex;align-items:center;transition:background .1s;position:relative}
+.row+.row{border-top:1px solid #f3f1ee}
+.row:hover{background:#fbfaf9}
+.row.dragging{opacity:.35;background:var(--blue-10)}
+.row.drag-over{box-shadow:inset 0 2px 0 var(--blue)}
+.grip{width:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:grab;color:var(--text3);font-size:14px;user-select:none;padding:14px 0;letter-spacing:1px;transition:color .15s}
+.grip:active{cursor:grabbing}
+.grip:hover{color:var(--text)}
+.row input{width:100%;padding:12px 18px 12px 0;border:none;font:13px/1.5 var(--font);color:var(--text);background:transparent;outline:none;transition:background .12s;border-radius:6px}
+.row input:focus{background:#f3f5ff}
+.row input::placeholder{color:var(--text3)}
+.row .col-act{width:48px;text-align:center;flex-shrink:0}
+.row.free .col-v input{color:var(--red);font-weight:600}
+.act-btn{border:none;background:none;color:var(--text3);cursor:pointer;font-size:15px;width:32px;height:32px;border-radius:50%;transition:all .12s;line-height:32px;padding:0}
+.act-btn:hover{color:var(--red);background:var(--red-10)}
+
+/* ---- 底部操作 ---- */
+.add-foot{padding:12px 18px;display:flex;align-items:center;gap:12px;border-top:1px solid var(--border)}
+.add-foot button{padding:8px 18px;border:1px dashed var(--border);border-radius:20px;background:var(--card);color:var(--blue);cursor:pointer;font:13px/1 var(--font);font-weight:600;transition:all .15s}
+.add-foot button:hover{border-color:var(--blue);background:var(--blue-10)}
+.add-foot .count{font-size:12px;color:var(--text3);margin-left:auto}
+.footer-bar{display:flex;align-items:center;gap:14px;padding:14px 18px;border-top:1px solid var(--border);background:#fafaf9}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 24px;border-radius:var(--radius-sm);font:14px/1 var(--font);font-weight:600;cursor:pointer;border:none;transition:all .15s}
+.btn-success{background:var(--green);color:#fff}
+.btn-success:hover{background:var(--green-80);transform:translateY(-1px);box-shadow:0 2px 8px rgba(212,145,62,.25)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.status{font-size:12px;font-weight:500}
+.status-ok{color:var(--green)}.status-err{color:var(--red)}.status-info{color:var(--text3)}.status-warn{color:#d4a03a}
+.readonly .row input{pointer-events:none}
+.readonly .act-btn,.readonly .add-foot button,.readonly .footer-bar button,.readonly .grip{display:none}
+
+/* ---- 口令门 ---- */
+.gate{position:fixed;inset:0;background:#f8f6f2;display:flex;align-items:center;justify-content:center;z-index:100;font:14px/1.65 var(--font)}
+.gate-card{text-align:center;max-width:320px;padding:40px 32px}
+.gate-card h2{font-size:18px;font-weight:700;margin-bottom:8px}
+.gate-card p{font-size:13px;color:var(--text2);margin-bottom:20px}
+.gate-card input{display:block;width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font:14px/1 var(--font);text-align:center;outline:none;margin-bottom:12px;transition:border-color .15s}
+.gate-card input:focus{border-color:var(--blue)}
+.gate-card .gate-btn{display:block;width:100%;padding:10px;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font:14px/1 var(--font);font-weight:600;cursor:pointer;transition:opacity .15s}
+.gate-card .gate-btn:hover{opacity:.9}
+.gate-card .gate-err{font-size:12px;color:var(--red);margin-top:8px;min-height:18px}
+</style>
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <input id="gateInput" type="password" placeholder="口令" autofocus onkeydown="if(event.key==='Enter')checkGate()">
+    <button class="gate-btn" onclick="checkGate()" id="gateBtn">确认</button>
+    <div class="gate-err" id="gateErr"></div>
+  </div>
+</div>
+<div class="container" id="app" style="display:none">
+<div class="top"><a href="index.html">← 返回</a><h1>任务价目与识别词</h1></div>
+<div class="tabs">
+  <button class="tab active" id="tab-prices" onclick="switchTab('prices')">任务价目表</button>
+  <button class="tab" id="tab-keys" onclick="switchTab('keys')">模糊识别词</button>
+</div>
+<div class="panel" id="panel"></div>
+</div>
+
+<script>
+/**
+ * 任务价目与识别词配置页面
+ * 功能：
+ *   - 双 Tab 编辑：任务价目表 / 模糊识别词
+ *   - 拖拽排序调整显示/匹配顺序
+ *   - 行内编辑，一键保存
+ * 存储：Netlify Blobs（prices key），本地 localStorage 缓存
+ * 鉴权：ADMIN_PASS 环境变量，x-admin-pass 请求头
+ */
+
+// ---------- 口令门 ----------
+// 前端仅作 UI 引导，真实校验在服务端（环境变量 ADMIN_PASS）
+var ADMIN_PASS = null;
+(function(){
+  var input = document.getElementById("gateInput");
+  var err = document.getElementById("gateErr");
+
+  window.checkGate = function() {
+    var pass = input.value.trim();
+    if (!pass) { err.textContent = "请输入口令"; return; }
+    ADMIN_PASS = pass;
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("app").style.display = "";
+    load();
+  };
+})();
+
+// ---------- 数据加载 ----------
+var API = (function(){
+  var host = location.host;
+  if (host.indexOf("netlify.app") !== -1 || host.indexOf("localhost") !== -1) return "/.netlify/functions/config";
+  return localStorage.getItem("eve_api_url") || "";
+})();
+var config = null;
+var currentTab = "prices";
+var dragSrc = null;
+var offlineMode = false;
+
+function load() {
+  var ver = parseInt(localStorage.getItem("eve_config_version"), 10) || 0;
+  var p = API ? fetch(API + "?v=" + ver).then(function(r) { if (!r.ok) throw new Error(); return r.json(); }) : Promise.reject();
+  p.then(function(data) {
+      if (data.unchanged) {
+        var cached = localStorage.getItem("eve_config");
+        config = cached ? JSON.parse(cached) : { bosses:{}, taskPrices:{}, keyMap:{} };
+      } else {
+        config = data;
+        localStorage.setItem("eve_config", JSON.stringify(data));
+        if (data.v) localStorage.setItem("eve_config_version", data.v);
+      }
+      ready();
+    })
+   .catch(function() {
+     // 离线降级：从本地缓存读取，只读模式
+     var raw = localStorage.getItem("eve_config");
+     if (raw) { try { config = JSON.parse(raw); } catch(e) { config = null; } }
+     if (!config || !config.taskPrices) config = {bosses:{}, taskPrices:{}, keyMap:{}};
+     offlineMode = true;
+     ready();
+     document.getElementById("panel").classList.add("readonly");
+   });
+}
+
+function ready() {
+  config.taskPrices = config.taskPrices || {};
+  config.keyMap = config.keyMap || {};
+  config.keyMapOrder = ensureOrder(config.keyMapOrder, config.keyMap);
+  config.taskPriceOrder = ensureOrder(config.taskPriceOrder, config.taskPrices);
+  switchTab("prices");
+}
+
+/**
+ * 合并有序数组与数据对象
+ * 作用：保留用户拖拽排序的顺序，同时追加新增的 key 到末尾
+ * 逻辑：已有顺序 → 保留；新增 key → 追加到末尾
+ */
+function ensureOrder(orderArray, dataObj) {
+  if (!orderArray || !Array.isArray(orderArray)) {
+    return Object.keys(dataObj).sort(function(a,b){return b.length-a.length});
+  }
+  var known = {};
+  orderArray.forEach(function(k) { known[k] = true; });
+  var newKeys = Object.keys(dataObj).filter(function(k) { return !known[k]; });
+  return orderArray.concat(newKeys);
+}
+
+function htmlEscape(s) { return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+function getActiveData() { return currentTab === "prices" ? config.taskPrices : config.keyMap; }
+
+// ---------- Tab 切换 & 渲染 ----------
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById("tab-prices").className = "tab" + (tab === "prices" ? " active" : "");
+  document.getElementById("tab-keys").className = "tab" + (tab === "keys" ? " active" : "");
+  render();
+}
+
+function render() {
+  var data = getActiveData();
+  var isPrice = currentTab === "prices";
+  var isKey = currentTab === "keys";
+  var order = isKey ? config.keyMapOrder : config.taskPriceOrder;
+  var headerKeys = order ? order.filter(function(k){return data.hasOwnProperty(k);}) : Object.keys(data);
+
+  var html = '<div class="table-head">';
+  html += '<span class="col-grip"></span>';
+  html += '<span class="col-k">' + (isPrice ? '任务名称' : '关键词') + '</span>';
+  html += '<span class="col-v">' + (isPrice ? '价格 (M)' : '映射任务名') + '</span>';
+  html += '<span></span></div>';
+
+  for (var i = 0; i < headerKeys.length; i++) {
+    var key = headerKeys[i];
+    if (!data.hasOwnProperty(key)) continue;
+    var val = data[key];
+    var freeClass = (isPrice && Number(val) === 0) ? ' free' : '';
+    html += '<div class="row' + freeClass + '" draggable="true" ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">';
+    html += '<div class="grip">≡</div>';
+    html += '<div class="col-k"><input value="' + htmlEscape(key) + '" data-old="' + htmlEscape(key) + '" data-field="key" onchange="onFieldChange(this)" placeholder="名称"></div>';
+    html += '<div class="col-v"><input value="' + htmlEscape(String(val)) + '" data-old="' + htmlEscape(key) + '" data-field="val" onchange="onFieldChange(this)" placeholder="值"></div>';
+    html += '<div class="col-act"><button class="act-btn" onclick="deleteRow(this)">×</button></div>';
+    html += '</div>';
+  }
+
+  html += '<div class="add-foot"><button onclick="addRow()">+ 添加</button><span class="count">' + headerKeys.length + ' 条</span></div>';
+  var statusText = offlineMode ? "离线模式 · 只读" : "在线模式";
+  var statusClass = offlineMode ? "status status-info" : "status status-ok";
+  html += '<div class="footer-bar"><button class="btn btn-success" id="saveBtn" onclick="save()">保存配置</button><span class="' + statusClass + '" id="status">' + statusText + '</span></div>';
+  document.getElementById("panel").innerHTML = html;
+}
+
+// ---------- 行操作 ----------
+// 新增一行（自动命名避免冲突）
+function addRow() {
+  var data = getActiveData();
+  var prefix = currentTab === "prices" ? "新任务" : "新关键词";
+  var n = 1;
+  while (data[prefix + n] !== undefined) n++;
+  var newKey = prefix + n;
+  data[newKey] = currentTab === "prices" ? 0 : "目标";
+  var order = currentTab === "prices" ? config.taskPriceOrder : config.keyMapOrder;
+  if (order) order.push(newKey);
+  render();
+}
+
+/**
+ * 删除行
+ * 关键点：用 data-old 属性取原始 key，而不是 input.value
+ * 原因：如果用户正在编辑 key 时点删除，用 value 会拿到编辑中的值导致删错
+ */
+function deleteRow(btn) {
+  var row = findRow(btn);
+  var key = row.querySelector('[data-field="key"]').getAttribute("data-old");
+  delete getActiveData()[key];
+  var order = currentTab === "prices" ? config.taskPriceOrder : config.keyMapOrder;
+  if (order) {
+    var idx = order.indexOf(key);
+    if (idx !== -1) order.splice(idx, 1);
+  }
+  render();
+}
+
+// 向上查找最近的行元素
+function findRow(el) { while (el && !el.classList.contains("row")) el = el.parentElement; return el; }
+
+/**
+ * 字段变更处理（key 或 value 输入框）
+ *
+ * data-old 属性作用：
+ *   - 记录该行最初的 key，用于识别原始数据
+ *   - key 和 val 两个输入框都有 data-old，值相同（都是原始 key）
+ *   - 重命名 key 时必须同时更新两个输入框的 data-old
+ *     否则连续改名会导致 val 输入框的 data-old 还是旧值，删行时找错
+ */
+function onFieldChange(input) {
+  var row = findRow(input);
+  var field = input.getAttribute("data-field");
+  var oldKey = input.getAttribute("data-old");
+  var newVal = input.value.trim();
+  if (!newVal) return;
+  var data = getActiveData();
+
+  if (field === "key") {
+    // key 改名：做长度/字符/重复校验
+    if (newVal.length > 64) { alert("名称过长（最多64字符）"); input.value = oldKey; return; }
+    if (newVal.includes("/")) { alert("名称不能包含斜杠"); input.value = oldKey; return; }
+    if (newVal !== oldKey) {
+      if (data.hasOwnProperty(newVal)) { input.value = oldKey; return; }
+      // 迁移数据：新 key = 旧 key 的值，删旧 key
+      data[newVal] = data[oldKey];
+      delete data[oldKey];
+      // 更新排序数组中的 key
+      var order = currentTab === "prices" ? config.taskPriceOrder : config.keyMapOrder;
+      if (order) {
+        var idx = order.indexOf(oldKey);
+        if (idx !== -1) order[idx] = newVal;
+      }
+      // 关键：同时更新 key 和 val 两个输入框的 data-old
+      // 否则 val 框的 data-old 还是旧值，后续删行会找错数据
+      input.setAttribute("data-old", newVal);
+      row.querySelector('[data-field="val"]').setAttribute("data-old", newVal);
+    }
+  } else {
+    // value 变更：价格转数字，识别词保持字符串
+    if (currentTab === "prices") {
+      var num = Number(newVal);
+      data[oldKey] = isNaN(num) ? 0 : num;
+    } else {
+      data[oldKey] = newVal;
+    }
+  }
+}
+
+// ---------- 拖拽排序 ----------
+// HTML5 原生拖拽实现，通过 DOM 位置计算索引，同步到 order 数组
+
+// 开始拖拽：标记源行
+function onDragStart(e) {
+  dragSrc = e.target.closest(".row");
+  dragSrc.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+}
+
+// 拖拽经过：高亮目标行
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  var row = e.target.closest(".row");
+  if (row && row !== dragSrc) {
+    document.querySelectorAll(".row.drag-over").forEach(function(r) { r.classList.remove("drag-over"); });
+    row.classList.add("drag-over");
+  }
+}
+
+// 放下：根据 DOM 索引调整 order 数组顺序
+function onDrop(e) {
+  e.preventDefault();
+  document.querySelectorAll(".row.drag-over").forEach(function(r) { r.classList.remove("drag-over"); });
+  var target = e.target.closest(".row");
+  if (!target || target === dragSrc) return;
+
+  // 通过 DOM 位置计算新旧索引
+  var rows = Array.from(document.querySelectorAll(".row"));
+  var fromIdx = rows.indexOf(dragSrc);
+  var toIdx = rows.indexOf(target);
+  if (fromIdx === -1 || toIdx === -1) return;
+
+  // 同步到排序数组
+  var order = currentTab === "prices" ? config.taskPriceOrder : config.keyMapOrder;
+  if (!order) order = Object.keys(getActiveData());
+  var moved = order[fromIdx];
+  order.splice(fromIdx, 1);
+  order.splice(toIdx, 0, moved);
+  if (currentTab === "prices") config.taskPriceOrder = order;
+  else config.keyMapOrder = order;
+  render();
+}
+
+// 拖拽结束：清理样式
+function onDragEnd(e) {
+  document.querySelectorAll(".row.dragging").forEach(function(r) { r.classList.remove("dragging"); });
+  document.querySelectorAll(".row.drag-over").forEach(function(r) { r.classList.remove("drag-over"); });
+}
+
+// ---------- 保存配置 ----------
+/**
+ * 保存全部配置到服务端
+ *
+ * 请求头：x-admin-pass 鉴权
+ * 请求体：taskPrices, keyMap, keyMapOrder, taskPriceOrder, expectV
+ * 状态码：
+ *   200 = 成功
+ *   403 = 口令错误
+ *   409 = 版本冲突（他人已修改）
+ * 降级：网络失败时自动保存到 localStorage（本地模式）
+ */
+async function save() {
+  var btn = document.getElementById("saveBtn");
+  var st = document.getElementById("status");
+  btn.disabled = true; btn.textContent = "保存中..."; st.textContent = "保存中..."; st.className = "status status-info";
+  if (!API) {
+    localStorage.setItem("eve_config", JSON.stringify(config));
+    st.textContent = "仅保存在本地（未配置云端）"; st.className = "status status-warn";
+    btn.disabled = false; btn.textContent = "保存配置";
+    return;
+  }
+  try {
+    var ver = parseInt(localStorage.getItem("eve_config_version"), 10) || 0;
+    var r = await fetch(API, {method:"POST", headers:{"Content-Type":"application/json","x-admin-pass":ADMIN_PASS}, body:JSON.stringify({
+      taskPrices: config.taskPrices,
+      keyMap: config.keyMap,
+      keyMapOrder: config.keyMapOrder,
+      taskPriceOrder: config.taskPriceOrder,
+      expectV: ver
+    })});
+    if (r.status === 403) {
+      st.textContent = "口令错误，请刷新重试";
+      st.className = "status status-err";
+      btn.disabled = false;
+      btn.textContent = "保存配置";
+      return;
+    }
+    if (r.status === 409) {
+      st.textContent = "冲突！数据已被修改，请刷新页面";
+      st.className = "status status-err";
+      btn.textContent = "请刷新页面";
+      alert("保存失败：数据已被他人修改，请刷新页面后重新编辑。");
+      return;
+    }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    var data = await r.json();
+    localStorage.setItem("eve_config", JSON.stringify(config));
+    if (data.v) localStorage.setItem("eve_config_version", data.v);
+    st.textContent = "已保存（云端）"; st.className = "status status-ok";
+  } catch(e) {
+    localStorage.setItem("eve_config", JSON.stringify(config));
+    st.textContent = "仅保存在本地，未同步到云端"; st.className = "status status-warn";
+  }
+  btn.disabled = false; btn.textContent = "保存配置";
+}
+
+</script>
+</body>
+</html>

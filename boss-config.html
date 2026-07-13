@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>老板登记</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f8f6f2;--card:#fff;--border:#e8e5e0;--text:#1e1e1e;--text2:#6f6b65;--text3:#a8a39b;
+  --blue:#5b5ea6;--blue-10:#f4f3fa;--green:#d4913e;--green-80:#b87a2c;--red:#d4645c;--red-10:#fef6f5;
+  --radius:14px;--radius-sm:9px;--shadow-sm:0 1px 2px rgba(0,0,0,.03);
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+}
+body{background:var(--bg);min-height:100vh;font:14px/1.65 var(--font);color:var(--text);-webkit-font-smoothing:antialiased}
+.container{max-width:640px;margin:0 auto;padding:32px 20px 80px}
+.top{display:flex;align-items:center;margin-bottom:24px;gap:12px}
+.top a{color:var(--text2);text-decoration:none;font-size:13px;font-weight:500;transition:color .15s;display:flex;align-items:center;gap:4px}
+.top a:hover{color:var(--blue)}
+.top h1{font-size:20px;font-weight:700;flex:1;text-align:center;letter-spacing:-.3px}
+.boss-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:12px;box-shadow:var(--shadow-sm);transition:box-shadow .2s}
+.boss-card:hover{box-shadow:0 1px 3px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.04)}
+.boss-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.boss-avatar{width:40px;height:40px;border-radius:50%;background:var(--blue-10);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0}
+.boss-head input{flex:1;border:none;font:15px/1 var(--font);font-weight:700;color:var(--text);background:transparent;outline:none;padding:4px 0;border-bottom:2px solid transparent;transition:border-color .2s}
+.boss-head input:focus{border-bottom-color:var(--blue)}
+.boss-head input::placeholder{color:var(--text3);font-weight:400}
+.boss-head .del-boss{flex-shrink:0;border:none;background:none;color:var(--text3);cursor:pointer;font-size:13px;font-weight:500;padding:6px 12px;border-radius:var(--radius-sm);transition:all .15s}
+.boss-head .del-boss:hover{color:var(--red);background:var(--red-10)}
+.tags-wrap{display:flex;flex-wrap:wrap;gap:6px;min-height:30px;margin-bottom:12px;align-items:center}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;background:#f3f2ef;border-radius:20px;font-size:12px;font-weight:500;color:var(--text);transition:background .15s}
+.tag:hover{background:#eae7e3}
+.tag .remove{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;cursor:pointer;color:var(--text3);font-size:13px;transition:all .12s}
+.tag .remove:hover{background:var(--red);color:#fff}
+.empty-hint{color:var(--text3);font-size:12px}
+.add-row{display:flex;gap:8px}
+.add-row input{flex:1;padding:9px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font:13px/1 var(--font);color:var(--text);outline:none;background:var(--bg);transition:border-color .15s,background .15s}
+.add-row input:focus{border-color:var(--blue);background:var(--card)}
+.add-row input::placeholder{color:var(--text3)}
+.add-row button{padding:9px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--card);color:var(--blue);cursor:pointer;font:13px/1 var(--font);font-weight:600;transition:all .15s;white-space:nowrap}
+.add-row button:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.card-footer{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid #f3f1ee}
+.card-status{font-size:11px;font-weight:500}
+.card-status.ok{color:var(--green)}.card-status.err{color:var(--red)}.card-status.warn{color:#d4a03a}
+.bottom{position:sticky;bottom:0;display:flex;gap:12px;align-items:center;padding:16px 0;margin-top:24px;border-top:1px solid var(--border);background:var(--bg)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 22px;border-radius:var(--radius-sm);font:14px/1 var(--font);font-weight:600;cursor:pointer;border:none;transition:all .15s;white-space:nowrap}
+.btn-outline{background:var(--card);color:var(--blue);border:1px solid var(--blue)}
+.btn-outline:hover{background:var(--blue-10)}
+.btn-success{background:var(--green);color:#fff;border:none}
+.btn-success:hover{background:var(--green-80)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.status{font-size:12px;font-weight:500}
+.status-ok{color:var(--green)}.status-err{color:var(--red)}.status-info{color:var(--text3)}
+.readonly input,.readonly button{pointer-events:none;opacity:.6}
+.readonly .del-boss,.readonly .remove,.readonly .add-row,.readonly .card-footer{display:none}
+
+/* ---- 口令门 ---- */
+.gate{position:fixed;inset:0;background:#f8f6f2;display:flex;align-items:center;justify-content:center;z-index:100;font:14px/1.65 var(--font)}
+.gate-card{text-align:center;max-width:320px;padding:40px 32px}
+.gate-card h2{font-size:18px;font-weight:700;margin-bottom:8px}
+.gate-card p{font-size:13px;color:var(--text2);margin-bottom:20px}
+.gate-card input{display:block;width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font:14px/1 var(--font);text-align:center;outline:none;margin-bottom:12px;transition:border-color .15s}
+.gate-card input:focus{border-color:var(--blue)}
+.gate-card .gate-btn{display:block;width:100%;padding:10px;border-radius:var(--radius-sm);border:none;background:var(--blue);color:#fff;font:14px/1 var(--font);font-weight:600;cursor:pointer;transition:opacity .15s}
+.gate-card .gate-btn:hover{opacity:.9}
+.gate-card .gate-err{font-size:12px;color:var(--red);margin-top:8px;min-height:18px}
+</style>
+</head>
+<body>
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <input id="gateInput" type="password" placeholder="口令" autofocus onkeydown="if(event.key==='Enter')checkGate()">
+    <button class="gate-btn" onclick="checkGate()" id="gateBtn">确认</button>
+    <div class="gate-err" id="gateErr"></div>
+  </div>
+</div>
+<div class="container" id="app" style="display:none">
+<div class="top"><a href="index.html">← 返回</a><h1>老板登记</h1></div>
+<div id="bosses"></div>
+<div class="bottom">
+  <button class="btn btn-outline" id="addBossBtn" onclick="addBoss()">+ 新增老板</button>
+  <span class="status status-info" id="status">加载中...</span>
+</div>
+</div>
+
+<script>
+/**
+ * 老板登记页面
+ * 功能：管理「老板名 → 声望号名字列表」映射
+ * 特性：
+ *   - 卡片式独立编辑，单个保存
+ *   - 乐观锁（expectV）防并发覆盖
+ *   - 口令鉴权（BOSS_PASS，服务端校验）
+ *   - 离线降级只读模式
+ */
+
+// ---------- 口令门 ----------
+// 前端仅作 UI 引导，真实校验在服务端（环境变量 BOSS_PASS）
+var BOSS_PASS = null;
+(function(){
+  var input = document.getElementById("gateInput");
+  var err = document.getElementById("gateErr");
+
+  window.checkGate = function() {
+    var pass = input.value.trim();
+    if (!pass) { err.textContent = "请输入口令"; return; }
+    BOSS_PASS = pass;
+    document.getElementById("gate").style.display = "none";
+    document.getElementById("app").style.display = "";
+    load();
+  };
+})();
+
+// ---------- API & 数据加载 ----------
+var API = (function(){
+  var host = location.host;
+  if (host.indexOf("netlify.app") !== -1 || host.indexOf("localhost") !== -1) return "/.netlify/functions/config";
+  return localStorage.getItem("eve_api_url") || "";
+})();
+var config = { bosses: {} };
+
+/**
+ * 已保存名字映射表（关键机制）
+ * 作用：记录每个老板上次成功保存到服务端时的名字
+ * 原因：render() 会重置 data-old-name 属性，导致多次重命名后
+ *       无法追踪最初保存的名字，服务端无法清理旧 Blob
+ * 用法：saveOne 时从 _savedNames 取 oldName，不受 render 影响
+ */
+var _savedNames = {};
+
+// 加载配置：优先从服务端拉取，失败则降级到本地缓存（只读）
+function load() {
+  var ver = parseInt(localStorage.getItem("eve_config_version"), 10) || 0;
+  var p = API ? fetch(API + "?v=" + ver).then(function(r) { if (!r.ok) throw new Error(); return r.json(); }) : Promise.reject();
+  p.then(function(data) {
+      if (data.unchanged) {
+        // 版本未变，复用本地缓存
+        var cached = localStorage.getItem("eve_config");
+        config = cached ? JSON.parse(cached) : { bosses: {} };
+      } else {
+        // 版本变更，更新本地缓存
+        config = data;
+        localStorage.setItem("eve_config", JSON.stringify(data));
+        if (data.v) localStorage.setItem("eve_config_version", data.v);
+      }
+      if (!config.bosses) config.bosses = {};
+      // 初始化已保存名字映射：初始状态下名字 = 已保存名字
+      _savedNames = {};
+      Object.keys(config.bosses).forEach(function(n) { _savedNames[n] = n; });
+      render(); setStatus("在线模式","ok");
+    })
+   .catch(function() {
+     // 离线降级：从本地缓存读取，只读模式
+     var raw = localStorage.getItem("eve_config");
+     if (raw) { try { config = JSON.parse(raw); } catch(e) { config = null; } }
+     if (!config) config = {};
+     config.bosses = config.bosses || {};
+     _savedNames = {};
+     Object.keys(config.bosses).forEach(function(n) { _savedNames[n] = n; });
+     render();
+     setStatus("离线模式 · 只读", "info");
+     document.getElementById("bosses").classList.add("readonly");
+     document.getElementById("addBossBtn").style.display = "none";
+   });
+}
+
+function setStatus(msg, cls) {
+  var el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = "status status-" + cls;
+}
+
+// ---------- HTML 转义 ----------
+function htmlEscape(s) { return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// ---------- 渲染老板卡片 ----------
+function render() {
+  var names = Object.keys(config.bosses).sort();
+  var html = "";
+  for (var i = 0; i < names.length; i++) {
+    var name = names[i], ids = config.bosses[name] || [];
+    html += '<div class="boss-card" data-boss="' + htmlEscape(name) + '" data-old-name="' + htmlEscape(name) + '">';
+    html += '<div class="boss-head">';
+    html += '<div class="boss-avatar">' + htmlEscape(name.charAt(0)) + '</div>';
+    html += '<input value="' + htmlEscape(name) + '" onchange="renameBoss(this)" placeholder="老板名称">';
+    html += '<button class="del-boss" onclick="deleteBoss(this)">删除</button>';
+    html += '</div>';
+    html += '<div class="tags-wrap">';
+    if (ids.length) {
+      for (var j = 0; j < ids.length; j++) {
+        html += '<span class="tag" data-idx="' + j + '">' + htmlEscape(ids[j]) + '<span class="remove" onclick="deleteId(this)">×</span></span>';
+      }
+    } else {
+      html += '<span class="empty-hint">还没有声望号名字</span>';
+    }
+    html += '</div>';
+    html += '<div class="add-row">';
+    html += '<input placeholder="输入声望号名字，回车添加" onkeydown="if(event.key===\'Enter\')addId(this)">';
+    html += '<button onclick="addId(this)">添加</button>';
+    html += '</div>';
+    html += '<div class="card-footer">';
+    html += '<span class="card-status ok">已同步</span>';
+    html += '<button class="btn btn-outline" onclick="saveOne(this)">保存</button>';
+    html += '</div>';
+    html += '</div>';
+  }
+  document.getElementById("bosses").innerHTML = html;
+}
+
+// ---------- DOM 辅助函数 ----------
+// 向上查找最近的老板卡片元素
+function findBossCard(el) { while (el && !el.classList.contains("boss-card")) el = el.parentElement; return el; }
+// 从卡片 data-boss 属性取老板名
+function getBossName(card) { return card.getAttribute("data-boss"); }
+
+// ---------- 老板增删改（本地编辑，点保存才同步服务端） ----------
+
+// 新增空老板卡片（自动命名为"新老板N"）
+function addBoss() {
+  var n = 1;
+  while (config.bosses.hasOwnProperty("新老板" + n)) n++;
+  config.bosses["新老板" + n] = [];
+  render();
+}
+
+/**
+ * 删除老板
+ * 流程：先请求服务端 → 成功后才更新本地数据（防止本地删了但服务端没删）
+ * 鉴权：x-boss-pass 请求头
+ * 并发：expectV 乐观锁，冲突返回 409
+ */
+function deleteBoss(btn) {
+  var card = findBossCard(btn);
+  var name = getBossName(card);
+  if (!confirm("确定删除「" + name + "」及其所有ID？")) return;
+
+  // 离线模式：直接改本地
+  if (!API) {
+    delete config.bosses[name];
+    delete _savedNames[name];
+    render();
+    localStorage.setItem("eve_config", JSON.stringify(config));
+    return;
+  }
+
+  var st = card.querySelector(".card-status");
+  var delBtn = card.querySelector(".del-boss");
+  st.textContent = "删除中..."; st.className = "card-status";
+  if (delBtn) { delBtn.disabled = true; delBtn.style.opacity = "0.5"; }
+
+  var ver = parseInt(localStorage.getItem("eve_config_version"), 10) || 0;
+  fetch(API, {method:"POST", headers:{"Content-Type":"application/json", "x-boss-pass":BOSS_PASS}, body:JSON.stringify({remove:name, expectV:ver})})
+    .then(function(r) { return r.json().then(function(data) { return {ok:r.ok, status:r.status, data:data}; }); })
+    .then(function(result) {
+      if (result.status === 403) {
+        st.textContent = "口令错误"; st.className = "card-status err";
+        alert("口令错误，请刷新页面重新输入");
+        if (delBtn) { delBtn.disabled = false; delBtn.style.opacity = ""; }
+        return;
+      }
+      if (result.status === 409) {
+        st.textContent = "冲突！请刷新"; st.className = "card-status err";
+        alert("删除失败：数据已被他人修改，请刷新页面后重试。");
+        if (delBtn) { delBtn.disabled = false; delBtn.style.opacity = ""; }
+        return;
+      }
+      if (!result.ok) throw new Error();
+      // 服务端成功，再更新本地数据
+      delete config.bosses[name];
+      delete _savedNames[name];
+      render();
+      localStorage.setItem("eve_config", JSON.stringify(config));
+      if (result.data.v) localStorage.setItem("eve_config_version", result.data.v);
+    })
+    .catch(function() {
+      st.textContent = "删除失败"; st.className = "card-status err";
+      if (delBtn) { delBtn.disabled = false; delBtn.style.opacity = ""; }
+      alert("删除失败，请检查网络后重试。");
+    });
+}
+
+/**
+ * 重命名老板（仅本地改名，需保存才同步）
+ * 关键点：_savedNames 同步转移映射，确保多次改名后
+ *          saveOne 仍能找到最初保存时的 oldName，
+ *          服务端才能正确清理旧 Blob
+ */
+function renameBoss(input) {
+  var card = findBossCard(input);
+  var oldName = card.getAttribute("data-boss");
+  var newName = input.value.trim();
+  if (!newName || newName === oldName) { render(); return; }
+  if (newName.length > 32) { alert("老板名过长（最多32字符）"); render(); return; }
+  if (newName.includes("/")) { alert("老板名不能包含斜杠"); render(); return; }
+  if (config.bosses.hasOwnProperty(newName)) { alert("名称「" + newName + "」已存在"); render(); return; }
+  config.bosses[newName] = config.bosses[oldName];
+  delete config.bosses[oldName];
+  // 转移已保存名字映射，保持 oldName 可追溯
+  if (_savedNames.hasOwnProperty(oldName)) {
+    _savedNames[newName] = _savedNames[oldName];
+    delete _savedNames[oldName];
+  }
+  render();
+}
+
+// 添加声望号到当前老板卡片
+function addId(el) {
+  var card = findBossCard(el);
+  var name = getBossName(card);
+  var input = card.querySelector(".add-row input");
+  var id = input.value.trim();
+  if (!id) return;
+  if (id.length > 32) { alert("声望号名字过长（最多32字符）"); return; }
+  if (id.includes("/")) { alert("声望号名字不能包含斜杠"); return; }
+  if (config.bosses[name].indexOf(id) !== -1) { alert("该声望号名字已存在"); return; }
+  config.bosses[name].push(id);
+  input.value = "";
+  render();
+}
+
+// 按索引删除声望号
+function deleteId(btn) {
+  var tag = btn.parentElement;
+  var card = findBossCard(btn);
+  var name = getBossName(card);
+  var idx = parseInt(tag.getAttribute("data-idx"), 10);
+  if (isNaN(idx) || !config.bosses[name] || idx < 0 || idx >= config.bosses[name].length) return;
+  config.bosses[name].splice(idx, 1);
+  render();
+}
+
+/**
+ * 保存单个老板到服务端
+ *
+ * 请求参数：
+ *   name     - 老板名
+ *   ids      - 声望号数组
+ *   expectV  - 乐观锁版本号
+ *   oldName  - 重命名时传，服务端用它清理旧 Blob（可选）
+ *
+ * oldName 来源：从 _savedNames 取，不受 render 重置 data-old-name 影响
+ * 鉴权：x-boss-pass 请求头
+ * 并发：409 = 版本冲突，提示刷新
+ */
+function saveOne(el) {
+  var card = findBossCard(el);
+  var name = getBossName(card);
+  var oldName = _savedNames[name] || name;
+  var st = card.querySelector(".card-status");
+  var ids = config.bosses[name] || [];
+
+  if (!API) {
+    localStorage.setItem("eve_config", JSON.stringify(config));
+    _savedNames[name] = name;
+    st.textContent = "仅本地保存，未同步云端"; st.className = "card-status warn";
+    return;
+  }
+
+  st.textContent = "保存中..."; st.className = "card-status";
+  var ver = parseInt(localStorage.getItem("eve_config_version"), 10) || 0;
+  var payload = {name:name, ids:ids, expectV:ver};
+  if (oldName !== name) payload.oldName = oldName;
+  fetch(API, {method:"POST", headers:{"Content-Type":"application/json", "x-boss-pass":BOSS_PASS}, body:JSON.stringify(payload)})
+    .then(function(r) { return r.json().then(function(data) { return {ok:r.ok, status:r.status, data:data}; }); })
+    .then(function(result) {
+      if (result.status === 403) { st.textContent = "口令错误"; st.className = "card-status err"; alert("口令错误，请刷新页面重新输入"); return; }
+      if (result.status === 409) {
+        st.textContent = "冲突！请刷新"; st.className = "card-status err";
+        alert("保存失败：数据已被他人修改。请刷新页面后重新编辑。");
+        return;
+      }
+      if (!result.ok) throw new Error();
+      localStorage.setItem("eve_config", JSON.stringify(config));
+      if (result.data.v) localStorage.setItem("eve_config_version", result.data.v);
+      // 保存成功，更新已保存名字映射
+      if (oldName !== name) delete _savedNames[oldName];
+      _savedNames[name] = name;
+      card.setAttribute("data-old-name", name);
+      st.textContent = "已同步"; st.className = "card-status ok"; })
+    .catch(function() { st.textContent = "失败"; st.className = "card-status err"; });
+}
+</script>
+</body>
+</html>

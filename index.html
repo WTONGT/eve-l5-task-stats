@@ -329,8 +329,8 @@ function renderPlayerCard(name, group) {
   group.items.forEach(function(it) {
     h += '<div class="task-item' + (it.price === 0 ? ' zero' : '') + '">';
     h += '<span class="task-name">' + htmlEscape(it.task) + '</span>';
-    h += '<span class="task-detail">' + htmlEscape(it.location) + '｜' + htmlEscape(it.time) + '</span>';
-    h += '<span class="task-price">' + it.price + 'M</span>';
+    h += '<span class="task-detail">' + htmlEscape(it.location) + ' &middot; ' + htmlEscape(it.time) + ' &middot; ' + htmlEscape(it.publisher) + '</span>';
+    h += '<span class="task-price">' + it.price + ' M</span>';
     h += '</div>';
   });
   h += '</div>';

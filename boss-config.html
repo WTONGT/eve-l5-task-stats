@@ -391,6 +391,9 @@ function saveOne(el) {
       st.textContent = "已同步"; st.className = "card-status ok"; })
     .catch(function() { st.textContent = "失败"; st.className = "card-status err"; });
 }
+
+// 从 bfcache 恢复时（浏览器后退按钮）重新加载配置
+window.addEventListener('pageshow', function(e) { if (e.persisted && BOSS_PASS) load(); });
 </script>
 </body>
 </html>

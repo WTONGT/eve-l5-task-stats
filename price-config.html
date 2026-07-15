@@ -440,6 +440,8 @@ async function save() {
   btn.disabled = false; btn.textContent = "保存配置";
 }
 
+// 从 bfcache 恢复时（浏览器后退按钮）重新加载配置
+window.addEventListener('pageshow', function(e) { if (e.persisted && ADMIN_PASS) load(); });
 </script>
 </body>
 </html>

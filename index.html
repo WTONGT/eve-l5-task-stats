@@ -466,6 +466,8 @@ function showToast(msg) {
 }
 
 window.onload = loadConfig;
+// 从 bfcache 恢复时（浏览器后退按钮）重新加载配置，避免显示旧数据
+window.addEventListener('pageshow', function(e) { if (e.persisted) loadConfig(); });
 </script>
 </body>
 </html>

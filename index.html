@@ -20,11 +20,6 @@ header h1{font-size:22px;font-weight:700;letter-spacing:-.3px}
 .gear{position:absolute;top:0;right:0;color:var(--text3);text-decoration:none;font-size:18px;padding:4px 6px;border-radius:6px;transition:all .15s;line-height:1}
 .gear:hover{color:var(--text);background:#e8e5e1}
 .price-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden;margin-bottom:18px}
-.price-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;cursor:pointer;user-select:none;font-weight:600;font-size:14px;transition:background .15s}
-.price-head:hover{background:#fafaf9}
-.price-head .arrow{font-size:11px;color:var(--text3);transition:transform .25s}
-.price-body{max-height:0;overflow:hidden;transition:max-height .35s ease}
-.price-body.open{max-height:1200px}
 .price-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:12px}
 .price-tag{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);border-radius:var(--radius-sm);font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;transition:background .15s,color .15s}
 .price-tag:hover{background:var(--blue-10);color:var(--blue)}
@@ -76,13 +71,7 @@ textarea::placeholder{color:var(--text3)}
 <header><h1>五级任务报酬统计</h1><a href="price-config.html" class="gear" title="价目与识别词">⚙</a></header>
 
 <div class="price-card">
-  <div class="price-head" onclick="togglePrice()">
-    <span>任务价目表</span>
-    <span class="arrow" id="priceArrow" style="transform:rotate(180deg)">▼</span>
-  </div>
-  <div class="price-body open" id="priceBody">
-    <div class="price-grid" id="priceGrid"></div>
-  </div>
+  <div class="price-grid" id="priceGrid"></div>
 </div>
 
 <textarea id="input" placeholder="在游戏地点窗口中，选中所有完成任务的地点&#10;Ctrl+C 复制 &#8594; 在这里 Ctrl+V 粘贴即可"></textarea>
@@ -204,13 +193,6 @@ function fallbackCopyText(text, successMsg) {
     showToast("复制失败，请手动复制");
   }
   document.body.removeChild(ta);
-}
-
-// 价目表折叠切换
-function togglePrice() {
-  var body = document.getElementById("priceBody"), arrow = document.getElementById("priceArrow");
-  body.classList.toggle("open");
-  arrow.style.transform = body.classList.contains("open") ? "rotate(180deg)" : "rotate(0deg)";
 }
 
 // 清空输入和结果

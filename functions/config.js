@@ -85,8 +85,7 @@ const DEFAULT_PRICES = {
   taskPriceOrder: ["繁殖设施","天使的愤怒","净化的火焰","开拓号","清理门户","地平线上的萨沙","灭龙行动","萨沙取物","自由间谍","重重一螫","聚集力量","巨型驱动器","解放矿工A","解放矿工C","袭击护航队A","袭击护航队C","地点地点","斩龙行动","荣誉目标"]
 };
 
-// 生成 CORS 响应头：动态反射 Origin，比 * 更安全
-// 同时支持同源调用和自定义域名（用户通过 localStorage 配置 API 地址的场景）
+// CORS 响应头：动态反射 Origin，支持自定义域名场景
 function getCorsHeaders(request) {
   const origin = request.headers.get("origin") || "";
   return {
@@ -99,8 +98,7 @@ function getCorsHeaders(request) {
 
 // ---------- 工具函数 ----------
 
-// 统一 JSON 响应（带 CORS 头）
-// corsHeaders 由调用方传入，支持动态 Origin 反射
+// 统一 JSON 响应（自动带 CORS 头）
 function json(body, status = 200, corsHeaders = defaultCorsHeaders) {
   return new Response(JSON.stringify(body), {
     status,
@@ -138,12 +136,10 @@ function checkPass(request, headerName, envName) {
   return result === 0;
 }
 
-// 价格配置页鉴权
 function checkAdminPass(request) {
   return checkPass(request, "x-admin-pass", "ADMIN_PASS");
 }
 
-// 老板登记页鉴权
 function checkBossPass(request) {
   return checkPass(request, "x-boss-pass", "BOSS_PASS");
 }
@@ -314,7 +310,6 @@ async function handleGet(store, request, corsHeaders) {
       }
     }
 
-    // 读取价格配置
     const pricesRaw = await store.get(PRICES_KEY);
     const prices = pricesRaw ? JSON.parse(pricesRaw) : DEFAULT_PRICES;
 
@@ -383,7 +378,6 @@ async function handlePost(store, request, corsHeaders) {
         return resp({ ok: false, conflict: true, v: vCheck.v, error: vCheck.error || "数据已被他人修改，请刷新后重试" }, 409);
       }
 
-      // 写入老板数据
       await store.set(BOSS_PREFIX + body.name, JSON.stringify(body.ids));
 
       // 维护老板名索引
@@ -428,7 +422,6 @@ async function handlePost(store, request, corsHeaders) {
       const newIndex = index.filter(function(n) { return n !== body.remove; });
       await store.set(BOSSES_INDEX, JSON.stringify(newIndex));
 
-      // 清理对应 Blob
       try { await store.delete(BOSS_PREFIX + body.remove); } catch (e) { console.error("delete boss blob failed:", e); }
 
       const newV = await bumpVersion(store);
@@ -441,7 +434,6 @@ async function handlePost(store, request, corsHeaders) {
         return resp({ ok: false, error: "口令错误" }, 403);
       }
 
-      // 输入验证
       const valError = validatePricesConfig(body.taskPrices, body.keyMap);
       if (valError) {
         return resp({ ok: false, error: valError.error }, 400);
@@ -463,7 +455,6 @@ async function handlePost(store, request, corsHeaders) {
       return resp({ ok: true, saved: "prices", v: newV });
     }
 
-    // 无匹配模式
     return resp({ ok: false, error: "缺少有效字段" }, 400);
   } catch (e) {
     console.error("handlePost error:", e);
@@ -471,15 +462,9 @@ async function handlePost(store, request, corsHeaders) {
   }
 }
 
-// ---------- POST: 口令验证 ----------
+// ---------- 口令验证 ----------
 
-/**
- * 口令验证模式
- * body: { verify: "admin" | "boss" }
- * 对应请求头 x-admin-pass / x-boss-pass
- * 仅校验口令正确性，不读写任何数据
- * 用于配置页口令门：先验证再放行
- */
+// 口令验证模式（详见 handlePost 模式 0），仅校验口令，不读写数据
 async function handleVerify(body, request, resp) {
   if (body.verify === "admin") {
     if (!checkAdminPass(request)) return resp({ ok: false, error: "口令错误" }, 403);

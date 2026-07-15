@@ -300,7 +300,7 @@ function parseLine(line) {
   };
 }
 
-// 兼容旧函数名（保留，可能被外部引用
+// 兼容旧函数名（保留，可能被外部引用）
 function extractPublisherFallback(line) {
   var idx = line.lastIndexOf(" - ");
   return idx !== -1 ? line.substring(idx + 3).trim() : "未识别";

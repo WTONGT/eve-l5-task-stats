@@ -363,8 +363,7 @@ function saveOne(el) {
       if (!result.ok) throw new Error();
       localStorage.setItem("eve_config", JSON.stringify(config));
       if (result.data.v) localStorage.setItem("eve_config_version", result.data.v);
-      // 保存成功，更新已保存名字映射
-      if (oldName !== name) delete _savedNames[oldName];
+      // 保存成功，更新已保存名字映射（renameBoss 已删过 oldName，此处无需再删）
       _savedNames[name] = name;
       card.setAttribute("data-old-name", name);
       st.textContent = "已同步"; st.className = "card-status ok"; })

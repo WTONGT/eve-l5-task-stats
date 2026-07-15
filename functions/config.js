@@ -239,6 +239,13 @@ async function handlePost(store, request, corsHeaders) {
         }
       }
 
+      // 重命名场景：先校验旧名合法性，避免写入新 blob 后才发现 oldName 非法
+      if (body.oldName && body.oldName !== body.name) {
+        if (!validateBossName(body.oldName)) {
+          return resp({ ok: false, error: "旧老板名不合法" }, 400);
+        }
+      }
+
       // 乐观锁校验
       const vCheck = await checkExpectV(store, body);
       if (!vCheck.ok) {
@@ -253,9 +260,6 @@ async function handlePost(store, request, corsHeaders) {
 
       // 重命名场景：清理旧 Blob + 旧索引
       if (body.oldName && body.oldName !== body.name) {
-        if (!validateBossName(body.oldName)) {
-          return resp({ ok: false, error: "旧老板名不合法" }, 400);
-        }
         const oldIdx = index.indexOf(body.oldName);
         if (oldIdx !== -1) index.splice(oldIdx, 1);
         try { await store.delete(BOSS_PREFIX + body.oldName); } catch (e) { console.error("delete old boss blob failed:", e); }

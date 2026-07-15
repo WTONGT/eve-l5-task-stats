@@ -1,3 +1,5 @@
 data_sample.txt
 .workbuddy/
 node_modules/
+.netlify/
+.env

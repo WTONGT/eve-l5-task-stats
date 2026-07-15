@@ -281,13 +281,14 @@ function calc() {
   var unrecognized = [];
   text.split("\n").forEach(function(l) {
     l = l.trim(); if (!l) return;
-    var p = parseLine(l), price = CONFIG.taskPrices[p.task] || 0, boss = findBoss(p.publisher);
+    var p = parseLine(l), boss = findBoss(p.publisher);
 
     if (p.task === "未识别" || !boss || !CONFIG.taskPrices.hasOwnProperty(p.task)) {
       unrecognized.push(l);
       return;
     }
 
+    var price = CONFIG.taskPrices[p.task];
     var item = { task:p.task, location:p.location, publisher:p.publisher, time:p.time, price:price };
     if (!bossGroups[boss]) bossGroups[boss] = { total:0, items:[] };
     bossGroups[boss].items.push(item); bossGroups[boss].total += price;

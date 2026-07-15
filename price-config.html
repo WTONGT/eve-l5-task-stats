@@ -309,7 +309,9 @@ function onFieldChange(input) {
     // value 变更：价格转数字，识别词保持字符串
     if (currentTab === "prices") {
       var num = Number(newVal);
-      data[oldKey] = isNaN(num) ? 0 : num;
+      if (isNaN(num)) { alert("价格必须是数字"); input.value = data[oldKey]; return; }
+      if (num < 0 || num > 1000) { alert("价格范围 0-1000"); input.value = data[oldKey]; return; }
+      data[oldKey] = num;
     } else {
       data[oldKey] = newVal;
     }

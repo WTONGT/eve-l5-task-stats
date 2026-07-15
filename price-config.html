@@ -110,20 +110,50 @@ body{background:var(--bg);min-height:100vh;font:14px/1.65 var(--font);color:var(
  */
 
 // ---------- 口令门 ----------
-// 前端仅作 UI 引导，真实校验在服务端（环境变量 ADMIN_PASS）
+// 先向服务端验证口令，通过后才放行并加载数据
 var ADMIN_PASS = null;
 (function(){
   var input = document.getElementById("gateInput");
   var err = document.getElementById("gateErr");
+  var btn = document.getElementById("gateBtn");
 
   window.checkGate = function() {
     var pass = input.value.trim();
     if (!pass) { err.textContent = "请输入口令"; return; }
-    ADMIN_PASS = pass;
+
+    // 无 API 地址（自定义域名未配置）：跳过验证，直接进入离线模式
+    if (!API) {
+      ADMIN_PASS = pass;
+      openGate();
+      return;
+    }
+
+    btn.disabled = true; btn.textContent = "验证中..."; err.textContent = "";
+    fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-pass": pass },
+      body: JSON.stringify({ verify: "admin" })
+    }).then(function(r) {
+      if (r.status === 403) {
+        err.textContent = "口令错误";
+        btn.disabled = false; btn.textContent = "确认";
+        input.value = ""; input.focus();
+        return;
+      }
+      if (!r.ok) throw new Error();
+      ADMIN_PASS = pass;
+      openGate();
+    }).catch(function() {
+      err.textContent = "验证失败，请检查网络";
+      btn.disabled = false; btn.textContent = "确认";
+    });
+  };
+
+  function openGate() {
     document.getElementById("gate").style.display = "none";
     document.getElementById("app").style.display = "";
     load();
-  };
+  }
 })();
 
 // ---------- 数据加载 ----------

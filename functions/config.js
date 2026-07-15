@@ -322,7 +322,12 @@ async function handleGet(store, request, corsHeaders) {
 // ---------- POST: 写入配置（三种模式） ----------
 
 /**
- * POST 请求处理（三种写入模式，按 body 字段自动识别）
+ * POST 请求处理（四种模式，按 body 字段自动识别）
+ *
+ * 模式 0：口令验证
+ *   body: { verify: "admin" | "boss" }
+ *   对应请求头 x-admin-pass / x-boss-pass
+ *   仅校验口令，不读写数据。用于配置页口令门先验证再放行
  *
  * 模式 1：保存老板数据
  *   body: { name, ids, expectV, oldName? }
@@ -340,8 +345,15 @@ async function handleGet(store, request, corsHeaders) {
  *   - 参数错误 → 400
  */
 async function handlePost(store, request, corsHeaders) {
+  // ===== 模式 0：口令验证（不读写数据，仅校验口令） =====
+  const rawBody = await request.text();
+  let body;
+  try { body = JSON.parse(rawBody); } catch (e) {
+    return json({ ok: false, error: "请求格式错误" }, 400, corsHeaders);
+  }
+  if (body.verify) return handleVerify(body, request, corsHeaders);
+
   try {
-    const body = JSON.parse(await request.text());
     // 局部包装：自动带上 corsHeaders
     const resp = (data, status) => json(data, status, corsHeaders);
 
@@ -455,6 +467,29 @@ async function handlePost(store, request, corsHeaders) {
     console.error("handlePost error:", e);
     return resp({ ok: false, error: "请求处理失败" }, 400);
   }
+}
+
+// ---------- POST: 口令验证 ----------
+
+/**
+ * 口令验证模式
+ * body: { verify: "admin" | "boss" }
+ * 对应请求头 x-admin-pass / x-boss-pass
+ * 仅校验口令正确性，不读写任何数据
+ * 用于配置页口令门：先验证再放行
+ */
+async function handleVerify(body, request, corsHeaders) {
+  const resp = (data, status) => json(data, status, corsHeaders);
+
+  if (body.verify === "admin") {
+    if (!checkAdminPass(request)) return resp({ ok: false, error: "口令错误" }, 403);
+    return resp({ ok: true });
+  }
+  if (body.verify === "boss") {
+    if (!checkBossPass(request)) return resp({ ok: false, error: "口令错误" }, 403);
+    return resp({ ok: true });
+  }
+  return resp({ ok: false, error: "未知验证类型" }, 400);
 }
 
 // ---------- 版本号工具 ----------

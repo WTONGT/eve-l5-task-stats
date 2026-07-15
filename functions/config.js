@@ -55,7 +55,7 @@ const defaultCorsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, x-admin-pass, x-boss-pass"
 };
 
-// 口令校验：常量时间比较，防止时序攻击；环境变量未设置时一律拒绝
+// 口令校验：常量时间字符比较防时序攻击；长度不同时直接返回（长度本身非敏感信息）
 function checkPass(request, headerName, envName) {
   const expected = process.env[envName];
   if (!expected) return false;

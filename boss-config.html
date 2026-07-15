@@ -236,6 +236,13 @@ function addBoss() {
   render();
 }
 
+// 设置按钮禁用态（保存/删除请求中防重复点击）
+function setBtnBusy(btn, busy) {
+  if (!btn) return;
+  btn.disabled = busy;
+  btn.style.opacity = busy ? "0.5" : "";
+}
+
 // 删除老板：先请求服务端，成功后才更新本地数据（防止本地删了但服务端没删）
 function deleteBoss(btn) {
   var card = findBossCard(btn);
@@ -254,7 +261,7 @@ function deleteBoss(btn) {
   var st = card.querySelector(".card-status");
   var delBtn = card.querySelector(".del-boss");
   st.textContent = "删除中..."; st.className = "card-status";
-  if (delBtn) { delBtn.disabled = true; delBtn.style.opacity = "0.5"; }
+  setBtnBusy(delBtn, true);
 
   var ver = parseInt(localStorage.getItem("eve_config_version"), 10) || 0;
   fetch(API, {method:"POST", headers:{"Content-Type":"application/json", "x-boss-pass":BOSS_PASS}, body:JSON.stringify({remove:name, expectV:ver})})
@@ -263,13 +270,13 @@ function deleteBoss(btn) {
       if (result.status === 403) {
         st.textContent = "口令错误"; st.className = "card-status err";
         alert("口令错误，请刷新页面重新输入");
-        if (delBtn) { delBtn.disabled = false; delBtn.style.opacity = ""; }
+        setBtnBusy(delBtn, false);
         return;
       }
       if (result.status === 409) {
         st.textContent = "冲突！请刷新"; st.className = "card-status err";
         alert("删除失败：数据已被他人修改，请刷新页面后重试。");
-        if (delBtn) { delBtn.disabled = false; delBtn.style.opacity = ""; }
+        setBtnBusy(delBtn, false);
         return;
       }
       if (!result.ok) throw new Error();
@@ -282,7 +289,7 @@ function deleteBoss(btn) {
     })
     .catch(function() {
       st.textContent = "删除失败"; st.className = "card-status err";
-      if (delBtn) { delBtn.disabled = false; delBtn.style.opacity = ""; }
+      setBtnBusy(delBtn, false);
       alert("删除失败，请检查网络后重试。");
     });
 }
@@ -338,6 +345,7 @@ function saveOne(el) {
   var name = getBossName(card);
   var oldName = _savedNames[name] || name;
   var st = card.querySelector(".card-status");
+  var saveBtn = card.querySelector(".card-footer .btn");
   var ids = config.bosses[name] || [];
 
   if (!API) {
@@ -348,16 +356,18 @@ function saveOne(el) {
   }
 
   st.textContent = "保存中..."; st.className = "card-status";
+  setBtnBusy(saveBtn, true);
   var ver = parseInt(localStorage.getItem("eve_config_version"), 10) || 0;
   var payload = {name:name, ids:ids, expectV:ver};
   if (oldName !== name) payload.oldName = oldName;
   fetch(API, {method:"POST", headers:{"Content-Type":"application/json", "x-boss-pass":BOSS_PASS}, body:JSON.stringify(payload)})
     .then(function(r) { return r.json().then(function(data) { return {ok:r.ok, status:r.status, data:data}; }); })
     .then(function(result) {
-      if (result.status === 403) { st.textContent = "口令错误"; st.className = "card-status err"; alert("口令错误，请刷新页面重新输入"); return; }
+      if (result.status === 403) { st.textContent = "口令错误"; st.className = "card-status err"; alert("口令错误，请刷新页面重新输入"); setBtnBusy(saveBtn, false); return; }
       if (result.status === 409) {
         st.textContent = "冲突！请刷新"; st.className = "card-status err";
         alert("保存失败：数据已被他人修改。请刷新页面后重新编辑。");
+        setBtnBusy(saveBtn, false);
         return;
       }
       if (!result.ok) throw new Error();
@@ -366,8 +376,10 @@ function saveOne(el) {
       // 保存成功，更新已保存名字映射（renameBoss 已删过 oldName，此处无需再删）
       _savedNames[name] = name;
       card.setAttribute("data-old-name", name);
-      st.textContent = "已同步"; st.className = "card-status ok"; })
-    .catch(function() { st.textContent = "失败"; st.className = "card-status err"; });
+      st.textContent = "已同步"; st.className = "card-status ok";
+      setBtnBusy(saveBtn, false);
+    })
+    .catch(function() { st.textContent = "失败"; st.className = "card-status err"; setBtnBusy(saveBtn, false); });
 }
 
 // 从 bfcache 恢复时（浏览器后退按钮）重新加载配置

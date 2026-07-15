@@ -238,9 +238,7 @@ function parseLine(line) {
 
   if (candidates.length > 0) {
     location = candidates[0].replace(/\*$/, "").trim();
-  } else if (fields.length >= 3) {
-    location = fields[1].replace(/\*$/, "").trim();
-  } else if (fields.length === 2 && timeIdx < 0) {
+  } else if (fields.length >= 2 && (fields.length >= 3 || timeIdx < 0)) {
     location = fields[1].replace(/\*$/, "").trim();
   }
   if (!location) location = "未知";
@@ -369,6 +367,22 @@ function capture(el) {
   );
 }
 
+// 通用截图分享：截图 el → 剪贴板 → Web Share → 下载（三级降级）
+function shareCapture(el, successMsg, done) {
+  capture(el).then(function(canvas) {
+    canvas.toBlob(function(blob) {
+      if (!blob) { showToast("生成图片失败"); done(); return; }
+      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+        navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+          .then(function() { showToast(successMsg); done(); })
+          .catch(function() { tryFallbackShare(blob, done); });
+        return;
+      }
+      tryFallbackShare(blob, done);
+    }, "image/png");
+  }).catch(function() { showToast("截图生成失败，请重试"); done(); });
+}
+
 // 总体分享：截取整个结算结果区
 function shareAll() {
   if (_sharingAll) return;
@@ -378,18 +392,7 @@ function shareAll() {
 
   _sharingAll = true;
   showToast("生成中...");
-  capture(result).then(function(canvas) {
-    canvas.toBlob(function(blob) {
-      if (!blob) { showToast("生成图片失败"); _sharingAll = false; return; }
-      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
-        navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
-          .then(function() { showToast("已复制全部结算单，Ctrl+V 粘贴到QQ即可"); _sharingAll = false; })
-          .catch(function() { tryFallbackShare(blob, function(){ _sharingAll = false; }); });
-        return;
-      }
-      tryFallbackShare(blob, function(){ _sharingAll = false; });
-    }, "image/png");
-  }).catch(function() { showToast("截图生成失败，请重试"); _sharingAll = false; });
+  shareCapture(result, "已复制全部结算单，Ctrl+V 粘贴到QQ即可", function(){ _sharingAll = false; });
 }
 
 // 卡片分享：点击整卡片触发截图分享
@@ -401,20 +404,7 @@ function shareCard(id) {
 
   _sharingCardId = id;
   showToast("生成中...");
-
-  var done = function() { _sharingCardId = null; };
-  capture(card).then(function(canvas) {
-    canvas.toBlob(function(blob) {
-      if (!blob) { showToast("生成图片失败"); done(); return; }
-      if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
-        navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
-          .then(function() { showToast("已复制到剪贴板，Ctrl+V 粘贴到QQ即可"); done(); })
-          .catch(function() { tryFallbackShare(blob, done); });
-        return;
-      }
-      tryFallbackShare(blob, done);
-    }, "image/png");
-  }).catch(function() { showToast("生成图片失败"); done(); });
+  shareCapture(card, "已复制到剪贴板，Ctrl+V 粘贴到QQ即可", function(){ _sharingCardId = null; });
 }
 
 // 分享降级：Web Share API（移动端系统分享）

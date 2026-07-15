@@ -63,6 +63,12 @@ textarea::placeholder{color:var(--text3)}
 .footer-nav{display:flex;justify-content:center;gap:10px;margin-top:32px;padding-top:20px;border-top:1px solid var(--border)}
 .footer-nav a{color:var(--text2);text-decoration:none;font-size:13px;font-weight:500;padding:7px 16px;border-radius:20px;border:1px solid var(--border);transition:all .15s}
 .footer-nav a:hover{color:var(--blue);border-color:var(--blue);background:var(--blue-10)}
+
+/* ---- 未识别行提醒 ---- */
+.unrec-card{background:#fdeceb;border:1px solid var(--red);border-radius:var(--radius);padding:14px 18px;margin-bottom:18px;font-size:13px}
+.unrec-title{color:var(--red);font-weight:600;margin-bottom:8px}
+.unrec-list{color:var(--text2);word-break:break-all;line-height:1.9}
+.unrec-tip{margin-top:8px;color:var(--text3);font-size:12px}
 </style>
 </head>
 <body>
@@ -340,31 +346,44 @@ function calc() {
   if (!text) { alert("请粘贴任务地点数据"); return; }
   if (!CONFIG) { alert("配置加载中，请稍候"); return; }
 
-  var bossGroups = {}, unknown = { total:0, items:[] }, grandTotal = 0;
+  var bossGroups = {}, grandTotal = 0;
+  var unrecognized = [];
   text.split("\n").forEach(function(l) {
     l = l.trim(); if (!l) return;
     var p = parseLine(l), price = CONFIG.taskPrices[p.task] || 0, boss = findBoss(p.publisher);
+
+    if (p.task === "未识别" || !boss) {
+      unrecognized.push(l);
+      return;
+    }
+
     var item = { task:p.task, location:p.location, publisher:p.publisher, time:p.time, price:price };
-    if (boss) {
-      if (!bossGroups[boss]) bossGroups[boss] = { total:0, items:[] };
-      bossGroups[boss].items.push(item); bossGroups[boss].total += price;
-    } else { unknown.items.push(item); unknown.total += price; }
+    if (!bossGroups[boss]) bossGroups[boss] = { total:0, items:[] };
+    bossGroups[boss].items.push(item); bossGroups[boss].total += price;
     grandTotal += price;
   });
-  render(bossGroups, unknown, grandTotal);
+  render(bossGroups, grandTotal, unrecognized);
 }
 
 // ---------- 结果渲染 ----------
 var _cardIdCounter = 0;  // 分享卡片唯一 ID 计数器（防止 DOM ID 重复）
 
-// 渲染全部结果：老板卡片 + 未归属 + 总计栏
-function render(bossGroups, unknown, grandTotal) {
+// 渲染全部结果：未识别提醒 + 老板卡片 + 总计栏
+function render(bossGroups, grandTotal, unrecognized) {
   _cardIdCounter = 0;
   var html = '<div class="result-heading">统计结果</div>';
+
+  if (unrecognized && unrecognized.length) {
+    html += '<div class="unrec-card">';
+    html += '<div class="unrec-title">注意：有 ' + unrecognized.length + ' 行未识别（未识别老板或任务），已自动排除、不计入统计</div>';
+    html += '<div class="unrec-list">' + unrecognized.map(function(line) { return htmlEscape(line); }).join('<br>') + '</div>';
+    html += '<div class="unrec-tip">可自行补充老板ID或规范任务名称写法</div>';
+    html += '</div>';
+  }
+
   Object.keys(bossGroups).sort().forEach(function(name) {
     html += renderPlayerCard(name, bossGroups[name], true);
   });
-  if (unknown.items.length) html += renderPlayerCard("未归属", unknown, false);
   html += '<div class="grand-total" onclick="shareAll()">总收入 ' + grandTotal + ' M<span class="share-hint">点击分享全部结算单</span></div>';
   document.getElementById("result").innerHTML = html;
 }

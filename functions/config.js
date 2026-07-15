@@ -17,7 +17,7 @@
  *
  * ================ API 接口 ================
  *   GET  /?v=N        版本未变返回 {unchanged:true}，否则返回完整配置
- *   POST /            三种写入模式（见 handlePost 分支）
+ *   POST /            四种模式（口令验证 + 三种写入，见 handlePost 分支）
  *
  * ================ 鉴权机制 ================
  *   老板增删改   请求头 x-boss-pass  ↔ 环境变量 BOSS_PASS
@@ -123,12 +123,19 @@ const defaultCorsHeaders = {
  * @returns {boolean}           校验是否通过
  *
  * 规则：环境变量未设置时一律拒绝（防止空口令放行）
+ * 安全：使用常量时间比较，防止时序攻击逐字符推断口令
  */
 function checkPass(request, headerName, envName) {
   const expected = process.env[envName];
   if (!expected) return false;
   const provided = request.headers.get(headerName) || "";
-  return provided === expected;
+  // 常量时间比较：无论哪一位不同，都遍历完整长度
+  if (provided.length !== expected.length) return false;
+  let result = 0;
+  for (let i = 0; i < expected.length; i++) {
+    result |= provided.charCodeAt(i) ^ expected.charCodeAt(i);
+  }
+  return result === 0;
 }
 
 // 价格配置页鉴权
@@ -319,7 +326,7 @@ async function handleGet(store, request, corsHeaders) {
   }
 }
 
-// ---------- POST: 写入配置（三种模式） ----------
+// ---------- POST: 写入配置（四种模式） ----------
 
 /**
  * POST 请求处理（四种模式，按 body 字段自动识别）
@@ -345,17 +352,12 @@ async function handleGet(store, request, corsHeaders) {
  *   - 参数错误 → 400
  */
 async function handlePost(store, request, corsHeaders) {
-  // ===== 模式 0：口令验证（不读写数据，仅校验口令） =====
-  const rawBody = await request.text();
-  let body;
-  try { body = JSON.parse(rawBody); } catch (e) {
-    return json({ ok: false, error: "请求格式错误" }, 400, corsHeaders);
-  }
-  if (body.verify) return handleVerify(body, request, corsHeaders);
-
   try {
-    // 局部包装：自动带上 corsHeaders
+    const body = JSON.parse(await request.text());
     const resp = (data, status) => json(data, status, corsHeaders);
+
+    // ===== 模式 0：口令验证（不读写数据，仅校验口令） =====
+    if (body.verify) return handleVerify(body, request, resp);
 
     // ===== 模式 1：保存老板数据 =====
     if (body.name && Array.isArray(body.ids)) {
@@ -465,7 +467,7 @@ async function handlePost(store, request, corsHeaders) {
     return resp({ ok: false, error: "缺少有效字段" }, 400);
   } catch (e) {
     console.error("handlePost error:", e);
-    return resp({ ok: false, error: "请求处理失败" }, 400);
+    return json({ ok: false, error: "请求处理失败" }, 400, corsHeaders);
   }
 }
 
@@ -478,9 +480,7 @@ async function handlePost(store, request, corsHeaders) {
  * 仅校验口令正确性，不读写任何数据
  * 用于配置页口令门：先验证再放行
  */
-async function handleVerify(body, request, corsHeaders) {
-  const resp = (data, status) => json(data, status, corsHeaders);
-
+async function handleVerify(body, request, resp) {
   if (body.verify === "admin") {
     if (!checkAdminPass(request)) return resp({ ok: false, error: "口令错误" }, 403);
     return resp({ ok: true });

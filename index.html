@@ -89,10 +89,7 @@ textarea::placeholder{color:var(--text3)}
 
 <script src="html2canvas.min.js"></script>
 <script>
-/**
- * EVE 五级任务报酬统计
- * 粘贴游戏地点窗口数据 → 解析任务 → 按老板分组统计报酬
- */
+// EVE 五级任务报酬统计：粘贴游戏地点窗口数据 → 解析任务 → 按老板分组统计报酬
 
 // API 地址：Netlify 环境走相对路径，自定义域名从 localStorage 读取
 var API = (function(){
@@ -104,9 +101,8 @@ var API = (function(){
 // 默认配置（首次加载 / 离线降级时使用）
 var DEFAULT_CONFIG = { taskPrices: {}, keyMap: {}, keyMapOrder: [], taskPriceOrder: [], bosses: {} };
 
-// 全局状态
-var CONFIG = null;                   // 全局配置对象
-var _sortedKeysCache = null;         // keyMap 排序结果缓存，配置变更后重置
+var CONFIG = null;                   // 配置对象
+var _sortedKeysCache = null;         // keyMap 排序缓存
 
 // 正则预编译（性能优化）
 var TIME_REGEX = /\d{4}[\.\-\/]\d{2}[\.\-\/]\d{2}\s+\d{1,2}:\d{2}(:\d{2})?/;  // 日期时间

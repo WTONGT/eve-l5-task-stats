@@ -38,7 +38,7 @@ function getCorsHeaders(request) {
   };
 }
 
-// ---------- 工具函数 ----------
+// 工具函数
 
 // 统一 JSON 响应（自动带 CORS 头）
 function json(body, status = 200, corsHeaders = defaultCorsHeaders) {
@@ -138,7 +138,7 @@ function validatePricesConfig(taskPrices, keyMap) {
   return null;
 }
 
-// ---------- Functions v2 入口 ----------
+// Functions v2 入口
 
 export default async (request, context) => {
   const corsHeaders = getCorsHeaders(request);
@@ -329,9 +329,7 @@ async function handlePost(store, request, corsHeaders) {
   }
 }
 
-// ---------- 口令验证 ----------
-
-// 口令验证模式（详见 handlePost 模式 0），仅校验口令，不读写数据
+// 口令验证（仅校验口令，不读写数据）
 async function handleVerify(body, request, resp) {
   if (body.verify === "admin") {
     if (!checkAdminPass(request)) return resp({ ok: false, error: "口令错误" }, 403);
@@ -344,14 +342,9 @@ async function handleVerify(body, request, resp) {
   return resp({ ok: false, error: "未知验证类型" }, 400);
 }
 
-// ---------- 版本号工具 ----------
+// 版本号工具
 
-/**
- * 递增版本号并返回新版本
- * 优化：读 + 写一次完成，调用方无需再读一次拿新版本
- * 注意：Netlify Blobs 无原子 CAS，存在极小概率竞态，
- *       小团队（<10 人）场景可忽略
- */
+// 递增版本号并返回新版本（Netlify Blobs 无原子 CAS，小团队场景竞态可忽略）
 async function bumpVersion(store) {
   const curVer = await getVersion(store);
   const newVer = curVer + 1;

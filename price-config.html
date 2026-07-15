@@ -97,10 +97,7 @@ body{background:var(--bg);min-height:100vh;font:14px/1.65 var(--font);color:var(
 </div>
 
 <script>
-/**
- * 任务价目与识别词配置页面
- * 双 Tab 编辑：任务价目表 / 模糊识别词，支持拖拽排序
- */
+// 任务价目与识别词配置页面：双 Tab 编辑，支持拖拽排序
 
 // API 地址
 var API = (function(){
@@ -209,7 +206,7 @@ function htmlEscape(s) { return String(s).replace(/&/g,"&amp;").replace(/"/g,"&q
 
 function getActiveData() { return currentTab === "prices" ? config.taskPrices : config.keyMap; }
 
-// ---------- Tab 切换 & 渲染 ----------
+// Tab 切换 & 渲染
 function switchTab(tab) {
   currentTab = tab;
   document.getElementById("tab-prices").className = "tab" + (tab === "prices" ? " active" : "");
@@ -250,7 +247,7 @@ function render() {
   document.getElementById("panel").innerHTML = html;
 }
 
-// ---------- 行操作 ----------
+// 行操作
 // 新增一行（自动命名避免冲突）
 function addRow() {
   var data = getActiveData();
@@ -264,11 +261,7 @@ function addRow() {
   render();
 }
 
-/**
- * 删除行
- * 关键点：用 data-old 属性取原始 key，而不是 input.value
- * 原因：如果用户正在编辑 key 时点删除，用 value 会拿到编辑中的值导致删错
- */
+// 删除行：用 data-old 取原始 key（非 input.value），避免编辑中点删除删错
 function deleteRow(btn) {
   var row = findRow(btn);
   var key = row.querySelector('[data-field="key"]').getAttribute("data-old");
@@ -284,15 +277,7 @@ function deleteRow(btn) {
 // 向上查找最近的行元素
 function findRow(el) { while (el && !el.classList.contains("row")) el = el.parentElement; return el; }
 
-/**
- * 字段变更处理（key 或 value 输入框）
- *
- * data-old 属性作用：
- *   - 记录该行最初的 key，用于识别原始数据
- *   - key 和 val 两个输入框都有 data-old，值相同（都是原始 key）
- *   - 重命名 key 时必须同时更新两个输入框的 data-old
- *     否则连续改名会导致 val 输入框的 data-old 还是旧值，删行时找错
- */
+// 字段变更处理：data-old 记录原始 key，重命名时需同时更新 key 和 val 两个框的 data-old，否则连续改名后删行会找错
 function onFieldChange(input) {
   var row = findRow(input);
   var field = input.getAttribute("data-field");
@@ -316,8 +301,7 @@ function onFieldChange(input) {
         var idx = order.indexOf(oldKey);
         if (idx !== -1) order[idx] = newVal;
       }
-      // 关键：同时更新 key 和 val 两个输入框的 data-old
-      // 否则 val 框的 data-old 还是旧值，后续删行会找错数据
+      // 同时更新两个框的 data-old，否则后续删行找错
       input.setAttribute("data-old", newVal);
       row.querySelector('[data-field="val"]').setAttribute("data-old", newVal);
     }
@@ -332,8 +316,7 @@ function onFieldChange(input) {
   }
 }
 
-// ---------- 拖拽排序 ----------
-// HTML5 原生拖拽实现，通过 DOM 位置计算索引，同步到 order 数组
+// 拖拽排序（HTML5 原生实现，通过 DOM 位置计算索引，同步到 order 数组）
 
 // 开始拖拽：标记源行
 function onDragStart(e) {
@@ -383,18 +366,7 @@ function onDragEnd(e) {
   document.querySelectorAll(".row.drag-over").forEach(function(r) { r.classList.remove("drag-over"); });
 }
 
-// ---------- 保存配置 ----------
-/**
- * 保存全部配置到服务端
- *
- * 请求头：x-admin-pass 鉴权
- * 请求体：taskPrices, keyMap, keyMapOrder, taskPriceOrder, expectV
- * 状态码：
- *   200 = 成功
- *   403 = 口令错误
- *   409 = 版本冲突（他人已修改）
- * 降级：网络失败时自动保存到 localStorage（本地模式）
- */
+// 保存配置（x-admin-pass 鉴权，403=口令错误，409=版本冲突，网络失败降级 localStorage）
 async function save() {
   var btn = document.getElementById("saveBtn");
   var st = document.getElementById("status");

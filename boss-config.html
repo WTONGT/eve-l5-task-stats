@@ -82,10 +82,7 @@ body{background:var(--bg);min-height:100vh;font:14px/1.65 var(--font);color:var(
 </div>
 
 <script>
-/**
- * 老板登记页面
- * 管理老板名与声望号的映射关系
- */
+// 老板登记页面：管理老板名与声望号的映射关系
 
 // API 地址
 var API = (function(){
@@ -144,8 +141,7 @@ var BOSS_PASS = null;
   }
 })();
 
-// 已保存名字映射表：记录每个老板上次成功保存到服务端时的名字
-// 原因：render() 会重置 data-old-name 属性，导致多次重命名后无法追踪最初保存的名字
+// 已保存名字映射表：记录每个老板上次成功保存时的名字（render 会重置 data-old-name，需单独维护）
 var _savedNames = {};
 
 // 加载配置：优先从服务端拉取，失败则降级到本地缓存（只读）
@@ -291,12 +287,7 @@ function deleteBoss(btn) {
     });
 }
 
-/**
- * 重命名老板（仅本地改名，需保存才同步）
- * 关键点：_savedNames 同步转移映射，确保多次改名后
- *          saveOne 仍能找到最初保存时的 oldName，
- *          服务端才能正确清理旧 Blob
- */
+// 重命名老板（仅本地改名，需保存才同步）：_savedNames 同步转移映射，确保多次改名后 saveOne 仍能找到最初的 oldName
 function renameBoss(input) {
   var card = findBossCard(input);
   var oldName = card.getAttribute("data-boss");
@@ -341,19 +332,7 @@ function deleteId(btn) {
   render();
 }
 
-/**
- * 保存单个老板到服务端
- *
- * 请求参数：
- *   name     - 老板名
- *   ids      - 声望号数组
- *   expectV  - 乐观锁版本号
- *   oldName  - 重命名时传，服务端用它清理旧 Blob（可选）
- *
- * oldName 来源：从 _savedNames 取，不受 render 重置 data-old-name 影响
- * 鉴权：x-boss-pass 请求头
- * 并发：409 = 版本冲突，提示刷新
- */
+// 保存单个老板到服务端（x-boss-pass 鉴权，409=版本冲突，oldName 从 _savedNames 取用于重命名清理）
 function saveOne(el) {
   var card = findBossCard(el);
   var name = getBossName(card);

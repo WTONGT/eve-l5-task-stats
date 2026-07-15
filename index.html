@@ -41,16 +41,15 @@ textarea::placeholder{color:var(--text3)}
 .btn-gray{background:var(--bg);color:var(--text2);border:1px solid var(--border)}
 .btn-gray:hover{background:#eeebe8;color:var(--text)}
 .result-heading{font-size:16px;font-weight:700;text-align:center;margin-bottom:16px}
-.player-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:10px;box-shadow:var(--shadow-sm);transition:box-shadow .2s}
-.player-card:hover{box-shadow:var(--shadow)}
+.player-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:10px;box-shadow:var(--shadow-sm);transition:box-shadow .2s,transform .15s;cursor:pointer;user-select:none}
+.player-card:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
+.player-card:active{transform:translateY(0)}
 .player-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .player-info{display:flex;align-items:center;gap:10px}
 .player-avatar{width:38px;height:38px;border-radius:50%;background:var(--blue-10);color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;flex-shrink:0}
 .player-name{font-weight:700;font-size:15px}
 .player-meta{font-size:12px;color:var(--text3)}
 .player-total{font-weight:700;color:var(--green);font-size:14px;margin-left:auto}
-.share-btn{font-size:12px;color:var(--blue);cursor:pointer;font-weight:500;user-select:none;padding:4px 10px;border-radius:20px;transition:all .15s;background:var(--blue-10);border:none;margin-left:8px}
-.share-btn:hover{background:var(--blue);color:#fff}
 .task-items{overflow:hidden}
 .task-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f2f0ed;font-size:13px}
 .task-item:last-child{border-bottom:none}
@@ -370,11 +369,10 @@ function render(bossGroups, unknown, grandTotal) {
 function renderPlayerCard(name, group, isBoss) {
   var safeId = name.replace(SAFE_ID_REGEX, "") + "-" + _cardIdCounter++;
   var avatarBg = isBoss ? "" : ' style="background:#f5f0eb;color:#a09c96"';
-  var h = '<div class="player-card"><div class="player-header"><div class="player-info">';
+  var h = '<div class="player-card" id="box-' + safeId + '" onclick="shareCard(\'' + safeId + '\')"><div class="player-header"><div class="player-info">';
   h += '<div class="player-avatar"' + avatarBg + '>' + htmlEscape(isBoss ? name.charAt(0) : "?") + '</div>';
   h += '<div><div class="player-name">' + htmlEscape(name) + '</div><div class="player-meta">' + group.items.length + ' 个任务</div></div>';
   h += '</div><span class="player-total">' + group.total + ' M</span>';
-  h += '<button class="share-btn" onclick="event.stopPropagation();shareCard(\'' + safeId + '\')">分享</button>';
   h += '</div><div class="task-items" id="list-' + safeId + '">';
   group.items.forEach(function(it) {
     h += '<div class="task-item"><span class="task-name">' + htmlEscape(it.task) + '</span>';
@@ -391,7 +389,8 @@ function renderPlayerCard(name, group, isBoss) {
  *   2. Web Share API → 系统原生分享面板（移动端）
  *   3. 下载图片 → 浏览器本地保存（终极兜底）
  *
- * _sharingCardId 防止重复点击，分享期间按钮置灰不可点
+ * 卡片分享：点击整张卡片触发（无独立按钮），_sharingCardId 防重入
+ * 总体分享：点击总收入栏触发，_sharingAll 防重入
  */
 var _sharingCardId = null;
 var _sharingAll = false;  // 总体分享防重入锁
@@ -449,45 +448,32 @@ function shareAll() {
   }).catch(function() { showToast("截图生成失败，请重试"); _sharingAll = false; });
 }
 
-// 主入口：生成卡片截图 → 按降级链分享
+// 主入口：点击整卡片触发 → 截图 → 按降级链分享
 function shareCard(id) {
   if (_sharingCardId) return;
+  var card = document.getElementById("box-" + id);
+  if (!card) return;
+  if (typeof html2canvas !== "function") { showToast("截图组件未加载，请刷新页面重试"); return; }
 
-  var card = document.getElementById("list-" + id).parentElement;
-  var btn = card.querySelector(".share-btn");
-  if (btn) {
-    _sharingCardId = id;
-    var originalText = btn.textContent;
-    btn.textContent = "生成中...";
-    btn.style.opacity = "0.6";
-    btn.style.pointerEvents = "none";
-  }
+  _sharingCardId = id;
+  showToast("生成中...");
 
-  // 恢复按钮状态的清理函数
-  var resetBtn = function() {
-    if (btn) {
-      btn.textContent = originalText || "分享";
-      btn.style.opacity = "";
-      btn.style.pointerEvents = "";
-    }
-    _sharingCardId = null;
-  };
-
+  var done = function() { _sharingCardId = null; };
   // capture 会清除 hover/active 态，截图 → 转 Blob → 进入分享降级链
   capture(card).then(function(canvas) {
     canvas.toBlob(function(blob) {
-      if (!blob) { showToast("生成图片失败"); resetBtn(); return; }
+      if (!blob) { showToast("生成图片失败"); done(); return; }
 
       // 第 1 级：剪贴板（PC 端优先）
       if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
         navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
-          .then(function() { showToast("已复制到剪贴板，Ctrl+V 粘贴到QQ即可"); resetBtn(); })
-          .catch(function() { tryFallbackShare(blob, resetBtn); });
+          .then(function() { showToast("已复制到剪贴板，Ctrl+V 粘贴到QQ即可"); done(); })
+          .catch(function() { tryFallbackShare(blob, done); });
         return;
       }
-      tryFallbackShare(blob, resetBtn);
+      tryFallbackShare(blob, done);
     }, "image/png");
-  }).catch(function() { showToast("生成图片失败"); resetBtn(); });
+  }).catch(function() { showToast("生成图片失败"); done(); });
 }
 
 // 第 2 级降级：Web Share API（移动端系统分享）

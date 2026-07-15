@@ -209,8 +209,12 @@ function validatePricesConfig(taskPrices, keyMap) {
   for (const k of tpKeys) {
     if (k.length === 0 || k.length > 64) return { error: "任务名长度不合法（1-64字符）" };
     if (k.includes("/")) return { error: "任务名不能包含斜杠" };
-    if (typeof taskPrices[k] !== "number" || isNaN(taskPrices[k])) {
+    const price = taskPrices[k];
+    if (typeof price !== "number" || isNaN(price)) {
       return { error: "任务价格必须是数字" };
+    }
+    if (price < 0 || price > 1000) {
+      return { error: "任务价格超出范围（0-1000 M）" };
     }
   }
 

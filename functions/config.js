@@ -1,53 +1,33 @@
 /**
  * EVE 五级任务报酬统计 — 后端 API（Netlify Functions v2）
  *
- * ================ 部署要求 ================
+ * 部署要求：
  *   - Netlify Functions v2（export default 语法）
- *   - Netlify Blobs store: "config"（部署时在 UI 中启用 Blobs）
- *   - 环境变量：
- *       ADMIN_PASS  价格配置页口令
- *       BOSS_PASS   老板登记页口令
+ *   - Netlify Blobs store: "config"
+ *   - 环境变量：ADMIN_PASS（价格配置口令）、BOSS_PASS（老板登记口令）
  *
- * ================ 存储架构 ================
- * Netlify Blobs store: "config"
- *   boss-data/{name}  老板声望号数组    eg. ["Rick Greyman", "Mango TT"]
- *   bosses            老板名索引数组    eg. ["赵六", "小明"]
- *   prices            价格配置对象      { taskPrices, keyMap, keyMapOrder, taskPriceOrder }
- *   _version          全局版本号        递增计数器，用于增量同步 + 乐观锁
+ * 存储架构（Netlify Blobs store: "config"）：
+ *   boss-data/{name}  老板声望号数组
+ *   bosses            老板名索引数组
+ *   prices            价格配置对象 { taskPrices, keyMap, keyMapOrder, taskPriceOrder }
+ *   _version          全局版本号（增量同步 + 乐观锁）
  *
- * ================ API 接口 ================
+ * API 接口：
  *   GET  /?v=N        版本未变返回 {unchanged:true}，否则返回完整配置
- *   POST /            四种模式（口令验证 + 三种写入，见 handlePost 分支）
- *
- * ================ 鉴权机制 ================
- *   老板增删改   请求头 x-boss-pass  ↔ 环境变量 BOSS_PASS
- *   价格配置     请求头 x-admin-pass ↔ 环境变量 ADMIN_PASS
- *   环境变量未设置时，对应接口一律拒绝
- *
- * ================ 并发说明（重要）============
- *   Netlify Blobs 是最终一致性 KV 存储，不支持原子 CAS / 事务。
- *   乐观锁（expectV）采用 "先校验再写入" 模式，存在极小概率
- *   check-then-act 竞态窗口。小团队（<10 人同时编辑）场景可忽略。
- *   冲突时前端提示："数据已被他人修改，请刷新后重试"。
+ *   POST /            口令验证 + 三种写入模式
  */
 import { getStore } from "@netlify/blobs";
 
-// Blob key 前缀/常量
+// Blob key 常量
 const BOSS_PREFIX  = "boss-data/";   // 老板数据前缀
 const PRICES_KEY   = "prices";       // 价格配置 key
 const BOSSES_INDEX = "bosses";       // 老板名索引 key
 const VERSION_KEY  = "_version";     // 全局版本号 key
 
-// --------------- 默认配置（首次部署 / Blobs 为空时使用） ---------------
+// 默认配置（首次部署 / Blobs 为空时使用）
+const DEFAULT_PRICES = { taskPrices: {}, keyMap: {}, keyMapOrder: [], taskPriceOrder: [] };
 
-const DEFAULT_PRICES = {
-  taskPrices: {},
-  keyMap: {},
-  keyMapOrder: [],
-  taskPriceOrder: []
-};
-
-// CORS 响应头：动态反射 Origin，支持自定义域名场景
+// CORS 响应头：动态反射 Origin，支持自定义域名
 function getCorsHeaders(request) {
   const origin = request.headers.get("origin") || "";
   return {
@@ -75,21 +55,11 @@ const defaultCorsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, x-admin-pass, x-boss-pass"
 };
 
-/**
- * 口令校验
- * @param {Request} request     请求对象
- * @param {string}  headerName  请求头名
- * @param {string}  envName     环境变量名
- * @returns {boolean}           校验是否通过
- *
- * 规则：环境变量未设置时一律拒绝（防止空口令放行）
- * 安全：使用常量时间比较，防止时序攻击逐字符推断口令
- */
+// 口令校验：常量时间比较，防止时序攻击；环境变量未设置时一律拒绝
 function checkPass(request, headerName, envName) {
   const expected = process.env[envName];
   if (!expected) return false;
   const provided = request.headers.get(headerName) || "";
-  // 常量时间比较：无论哪一位不同，都遍历完整长度
   if (provided.length !== expected.length) return false;
   let result = 0;
   for (let i = 0; i < expected.length; i++) {
@@ -106,15 +76,7 @@ function checkBossPass(request) {
   return checkPass(request, "x-boss-pass", "BOSS_PASS");
 }
 
-/**
- * 乐观锁校验
- * @param {object} store  Blob store 对象
- * @param {object} body   请求体（含 expectV）
- * @returns {object}      { ok: boolean, v: number, error?: string }
- *
- * 规则：expectV 缺失或不匹配均视为冲突，返回当前版本号
- * 优化：只读一次版本号，避免重复 Blob 读取
- */
+// 乐观锁校验：expectV 缺失或不匹配均视为冲突，返回当前版本号
 async function checkExpectV(store, body) {
   const curVer = await getVersion(store);
   if (body.expectV === undefined) {
@@ -126,34 +88,17 @@ async function checkExpectV(store, body) {
   return { ok: true };
 }
 
-/**
- * 老板名校验（防路径遍历）
- * 规则：非空、≤32 字符、不含斜杠
- * 原因：斜杠会破坏 boss-data/ 前缀结构，导致路径遍历风险
- */
+// 老板名校验（防路径遍历）：非空、≤32 字符、不含斜杠
 function validateBossName(name) {
   return typeof name === "string" && name.length > 0 && name.length <= 32 && !name.includes("/");
 }
 
-/**
- * 声望号名校验
- * 规则：非空、≤32 字符、不含斜杠
- */
+// 声望号名校验：非空、≤32 字符、不含斜杠
 function validatePublisherId(id) {
   return typeof id === "string" && id.length > 0 && id.length <= 32 && !id.includes("/");
 }
 
-/**
- * 价格配置校验
- * @param {object} taskPrices   任务价目表
- * @param {object} keyMap       识别词映射
- * @returns {object|null}       校验失败返回 {error}，成功返回 null
- *
- * 规则：
- *   - taskPrices: key ≤64字、value 是数字、总数 ≤200 条
- *   - keyMap: key ≤64字、value ≤64字、总数 ≤200 条
- *   - 所有 key 不能含斜杠
- */
+// 价格配置校验：key ≤64字、value 数字、总数 ≤200 条、不含斜杠
 function validatePricesConfig(taskPrices, keyMap) {
   if (typeof taskPrices !== "object" || taskPrices === null) {
     return { error: "taskPrices 格式错误" };
@@ -212,22 +157,7 @@ export default async (request, context) => {
   return json({ ok: false, error: "Method not allowed" }, 405, corsHeaders);
 };
 
-// ---------- GET: 聚合全量配置 ----------
-
-/**
- * 首次部署初始化
- * 检测 Blobs 为空时，写入默认配置 + 初始化版本号为 1
- * 确保后续 POST 的乐观锁有正确的基准版本
- *
- * 写入顺序：先写数据，最后写版本号（版本号=1 表示"初始化已完成"）
- * 这样即使中途失败，下次检测到 ver===0 会重新初始化，不会出现
- * 版本号已更新但数据为空的情况。
- *
- * 竞态说明：极端情况下两个并发请求可能都判断 ver===0 并同时初始化，
- * 但数据内容相同，重复写入不影响正确性，版本号最终也是 1。
- *
- * @returns {boolean} 是否执行了初始化
- */
+// 首次部署初始化：检测 Blobs 为空时，写入默认配置 + 版本号 1
 async function ensureInitialized(store) {
   const ver = await getVersion(store);
   if (ver > 0) return false;
@@ -242,12 +172,7 @@ async function ensureInitialized(store) {
   return true;
 }
 
-/**
- * GET 请求处理
- * 流程：初始化检查 → 版本比对 → 版本未变则 304 式返回 → 版本变更则聚合全量数据
- * 数据聚合：老板索引 → 逐个读老板数据 + 价格配置 → 合并返回
- * 错误兜底：失败时返回默认配置（保证页面可用）
- */
+// GET 请求处理：版本比对，未变返回 unchanged，变更则聚合全量数据
 async function handleGet(store, request, corsHeaders) {
   try {
     const url = new URL(request.url);
@@ -287,31 +212,7 @@ async function handleGet(store, request, corsHeaders) {
   }
 }
 
-// ---------- POST: 写入配置（四种模式） ----------
-
-/**
- * POST 请求处理（四种模式，按 body 字段自动识别）
- *
- * 模式 0：口令验证
- *   body: { verify: "admin" | "boss" }
- *   对应请求头 x-admin-pass / x-boss-pass
- *   仅校验口令，不读写数据。用于配置页口令门先验证再放行
- *
- * 模式 1：保存老板数据
- *   body: { name, ids, expectV, oldName? }
- *   oldName 用于重命名场景，服务端用它清理旧 Blob + 索引
- *
- * 模式 2：删除老板
- *   body: { remove, expectV }
- *
- * 模式 3：保存价格配置
- *   body: { taskPrices, keyMap, keyMapOrder, taskPriceOrder, expectV }
- *
- * 通用：
- *   - 鉴权失败 → 403
- *   - 版本冲突 → 409
- *   - 参数错误 → 400
- */
+// POST 请求处理：四种模式（口令验证、保存老板、删除老板、保存价格）
 async function handlePost(store, request, corsHeaders) {
   try {
     const body = JSON.parse(await request.text());

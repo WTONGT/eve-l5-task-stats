@@ -101,39 +101,30 @@ textarea::placeholder{color:var(--text3)}
 <script src="html2canvas.min.js"></script>
 <script>
 /**
- * 五级任务报酬统计
- * 功能：粘贴 EVE 地点窗口数据 → 解析任务 → 按老板分组统计报酬
- * 存储：Netlify Blobs（版本号增量同步），离线降级 localStorage
+ * EVE 五级任务报酬统计
+ * 粘贴游戏地点窗口数据 → 解析任务 → 按老板分组统计报酬
  */
 
-// ---------- API 地址 ----------
-// Netlify 环境走相对路径，自定义域名从 localStorage 读取
+// API 地址：Netlify 环境走相对路径，自定义域名从 localStorage 读取
 var API = (function(){
   var host = location.host;
   if (host.indexOf("netlify.app") !== -1 || host.indexOf("localhost") !== -1) return "/.netlify/functions/config";
   return localStorage.getItem("eve_api_url") || "";
 })();
 
-// ---------- 默认配置（首次加载 / 离线降级时使用） ----------
-var DEFAULT_CONFIG = {
-  taskPrices: {},
-  keyMap: {},
-  keyMapOrder: [],
-  taskPriceOrder: [],
-  bosses: {}
-};
+// 默认配置（首次加载 / 离线降级时使用）
+var DEFAULT_CONFIG = { taskPrices: {}, keyMap: {}, keyMapOrder: [], taskPriceOrder: [], bosses: {} };
 
-// ---------- 全局状态 ----------
+// 全局状态
 var CONFIG = null;                   // 全局配置对象
 var _sortedKeysCache = null;         // keyMap 排序结果缓存，配置变更后重置
 
-// ---------- 正则预编译（性能优化） ----------
-// 避免每次 parseLine 调用时重新创建正则对象
-var TIME_REGEX = /\d{4}[\.\-\/]\d{2}[\.\-\/]\d{2}\s+\d{1,2}:\d{2}(:\d{2})?/;  // 日期时间格式
+// 正则预编译（性能优化）
+var TIME_REGEX = /\d{4}[\.\-\/]\d{2}[\.\-\/]\d{2}\s+\d{1,2}:\d{2}(:\d{2})?/;  // 日期时间
 var PURE_NUM_REGEX = /^-?\d+(\.\d+)?$/;     // 纯数字（坐标/数量/安全等级）
 var AU_REGEX = /^\d+(\.\d+)?\s*AU$/i;         // 距离单位 AU
 var LABEL_REGEX = /^(坐标|任务|地点|星域|星系|星座|安全|距离|分类|标签|类型)$/;  // 列标签词
-var SAFE_ID_REGEX = /[^a-zA-Z0-9\u4e00-\u9fff]/g;  // 安全 ID 清洗（移除特殊字符）
+var SAFE_ID_REGEX = /[^a-zA-Z0-9\u4e00-\u9fff]/g;  // 安全 ID 清洗
 
 // HTML 转义，防 XSS
 function htmlEscape(s) { return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
@@ -141,8 +132,7 @@ function htmlEscape(s) { return String(s).replace(/&/g,"&amp;").replace(/"/g,"&q
 // 页面入口：加载配置 → 渲染价目表
 function loadConfig() { fetchConfig().then(renderPriceGrid); }
 
-// 从服务端拉取配置，版本号未变则复用本地缓存（增量同步）
-// 失败时自动降级到 localStorage 缓存，保证离线可用
+// 从服务端拉取配置，版本号未变则复用本地缓存（增量同步），失败降级 localStorage
 function fetchConfig() {
   if (!API) { useLocalCache(); return Promise.resolve(); }
   var ver = parseInt(localStorage.getItem("eve_config_version"), 10) || 0;
@@ -150,16 +140,14 @@ function fetchConfig() {
     .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
     .then(function(data) {
       if (data.unchanged) {
-        // 版本未变，复用本地缓存
         var cached = localStorage.getItem("eve_config");
         CONFIG = cached ? JSON.parse(cached) : { bosses:{}, taskPrices:{}, keyMap:{} };
       } else {
-        // 版本变更，更新本地缓存
         CONFIG = data;
         localStorage.setItem("eve_config", JSON.stringify(data));
         if (data.v) localStorage.setItem("eve_config_version", data.v);
       }
-      _sortedKeysCache = null;  // 配置变更，清空排序缓存
+      _sortedKeysCache = null;
     })
     .catch(function() { useLocalCache(); });
 }
@@ -183,21 +171,15 @@ function renderPriceGrid() {
     var price = CONFIG.taskPrices[name];
     return '<div class="price-tag' + (price === 0 ? ' free' : '') + '" data-task="' + htmlEscape(name) + '">' + htmlEscape(name) + '<span class="price-num">' + htmlEscape(price) + 'M</span></div>';
   }).join("");
-  // 事件绑定：从 data-task 读取任务名，避免内联 onclick 的 XSS 风险
   grid.querySelectorAll(".price-tag[data-task]").forEach(function(el) {
-    el.addEventListener("click", function() {
-      copyTaskName(this.getAttribute("data-task"));
-    });
+    el.addEventListener("click", function() { copyTaskName(this.getAttribute("data-task")); });
   });
 }
 
-// ---------- 文本复制 ----------
-// 优先 Clipboard API，失败回退 execCommand
+// 文本复制：优先 Clipboard API，失败回退 execCommand
 function copyText(text, successMsg) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text)
-      .then(function() { showToast(successMsg); })
-      .catch(function() { fallbackCopyText(text, successMsg); });
+    navigator.clipboard.writeText(text).then(function() { showToast(successMsg); }).catch(function() { fallbackCopyText(text, successMsg); });
   } else {
     fallbackCopyText(text, successMsg);
   }
@@ -224,52 +206,35 @@ function fallbackCopyText(text, successMsg) {
   document.body.removeChild(ta);
 }
 
-// ---------- 价目表折叠 ----------
+// 价目表折叠切换
 function togglePrice() {
   var body = document.getElementById("priceBody"), arrow = document.getElementById("priceArrow");
   body.classList.toggle("open");
   arrow.style.transform = body.classList.contains("open") ? "rotate(180deg)" : "rotate(0deg)";
 }
 
+// 清空输入和结果
 function clearAll() {
   document.getElementById("input").value = "";
   document.getElementById("result").innerHTML = "";
 }
 
-// ---------- 数据解析 ----------
-/**
- * EVE 地点窗口数据解析（核心算法）
- *
- * 设计思路：不依赖固定列索引，通过内容特征识别各字段，
- * 兼容不同玩家的列设置差异。
- *
- * 字段识别策略：
- *   任务名  → 第一列，去除行首数字序号
- *   时间    → 全字段正则匹配（日期+时间格式）
- *   发布者  → 时间后最后一列，兜底用行末 " - " 提取
- *   地点    → 任务名与时间之间，排除数字/距离/标签词后，
- *              取第一个候选（离任务名最近 = 星系/空间站名）
- */
+// 数据解析：不依赖固定列索引，通过内容特征识别各字段
 function parseLine(line) {
   var raw = line.trim();
   if (!raw) return { task:"未识别", location:"未知", time:"", publisher:"未识别" };
 
-  // 按多空格或 Tab 分割，过滤空字段
   var fields = raw.split(/\s{2,}|\t+/).filter(function(f) { return f.trim().length > 0; });
   if (fields.length === 0) return { task:"未识别", location:"未知", time:"", publisher:"未识别" };
 
-  // 任务名：第一列，去行首数字序号（EVE 地点列表默认带序号）
   var taskName = fields[0].replace(/^\d+\s*/, "");
 
-  // 时间：在所有字段中正则匹配，找到即记录位置
   var timeIdx = -1, timeStr = "";
   for (var i = 0; i < fields.length; i++) {
     var m = fields[i].match(TIME_REGEX);
     if (m) { timeIdx = i; timeStr = m[0]; break; }
   }
 
-  // 发布者：时间之后最后一个字段（通常是声望号名）
-  // 兜底：行末 " - " 分隔后内容
   var publisher = "";
   if (timeIdx >= 0 && timeIdx + 1 < fields.length) {
     publisher = fields[fields.length - 1].trim();
@@ -280,9 +245,6 @@ function parseLine(line) {
   }
   if (!publisher) publisher = "未识别";
 
-  // 地点候选：任务名 ~ 时间之间的字段
-  // 排除：纯数字（坐标/安全等级）、AU 距离、列标签词、分隔符
-  // 取第一个候选 = 离任务名最近 = 星系/空间站名
   var location = "未知";
   var candidates = [];
   var endIdx = timeIdx >= 0 ? timeIdx : fields.length;
@@ -290,16 +252,15 @@ function parseLine(line) {
   for (var j = 1; j < endIdx; j++) {
     var f = fields[j].trim();
     if (!f) continue;
-    if (PURE_NUM_REGEX.test(f)) continue;  // 坐标/数量/安全等级
-    if (AU_REGEX.test(f)) continue;         // 距离（AU）
-    if (LABEL_REGEX.test(f)) continue;      // 列标签（星域/星系/星座等）
-    if (f === "-") continue;                // 分隔符
+    if (PURE_NUM_REGEX.test(f)) continue;
+    if (AU_REGEX.test(f)) continue;
+    if (LABEL_REGEX.test(f)) continue;
+    if (f === "-") continue;
     candidates.push(f);
   }
 
-  // 优先用候选列表第一个，兜底用第二列
   if (candidates.length > 0) {
-    location = candidates[0].replace(/\*$/, "").trim();  // 去末尾星号（EVE 标记）
+    location = candidates[0].replace(/\*$/, "").trim();
   } else if (fields.length >= 3) {
     location = fields[1].replace(/\*$/, "").trim();
   } else if (fields.length === 2 && timeIdx < 0) {
@@ -307,12 +268,7 @@ function parseLine(line) {
   }
   if (!location) location = "未知";
 
-  return {
-    task: recognizeTask(taskName),
-    location: location,
-    time: timeStr,
-    publisher: publisher
-  };
+  return { task: recognizeTask(taskName), location: location, time: timeStr, publisher: publisher };
 }
 
 // 兼容旧函数名（保留，可能被外部引用）
@@ -321,11 +277,7 @@ function extractPublisherFallback(line) {
   return idx !== -1 ? line.substring(idx + 3).trim() : "未识别";
 }
 
-/**
- * 任务名模糊匹配
- * 按 keyMapOrder 顺序匹配（长关键词优先），命中即返回映射后的标准任务名
- * 匹配结果缓存到 _sortedKeysCache 避免重复排序
- */
+// 任务名模糊匹配：按 keyMapOrder 顺序匹配，长关键词优先
 function recognizeTask(rawName) {
   if (!_sortedKeysCache) {
     var order = CONFIG.keyMapOrder;
@@ -348,8 +300,7 @@ function findBoss(publisherId) {
   return null;
 }
 
-// ---------- 统计计算 ----------
-// 流程：逐行解析 → 识别任务名 → 查价目 → 匹配老板 → 分组累加
+// 统计计算：逐行解析 → 识别任务名 → 查价目 → 匹配老板 → 分组累加
 function calc() {
   var text = document.getElementById("input").value.trim();
   if (!text) { alert("请粘贴任务地点数据"); return; }
@@ -374,10 +325,9 @@ function calc() {
   render(bossGroups, grandTotal, unrecognized);
 }
 
-// ---------- 结果渲染 ----------
-var _cardIdCounter = 0;  // 分享卡片唯一 ID 计数器（防止 DOM ID 重复）
+// 结果渲染：未识别提醒 + 老板卡片 + 总计栏
+var _cardIdCounter = 0;
 
-// 渲染全部结果：未识别提醒 + 老板卡片 + 总计栏
 function render(bossGroups, grandTotal, unrecognized) {
   _cardIdCounter = 0;
   var html = '<div class="result-heading">统计结果</div>';
@@ -397,7 +347,7 @@ function render(bossGroups, grandTotal, unrecognized) {
   document.getElementById("result").innerHTML = html;
 }
 
-// 渲染单个老板卡片 / 未归属卡片
+// 渲染单个老板卡片
 function renderPlayerCard(name, group, isBoss) {
   var safeId = name.replace(SAFE_ID_REGEX, "") + "-" + _cardIdCounter++;
   var avatarBg = isBoss ? "" : ' style="background:#f5f0eb;color:#a09c96"';
@@ -414,24 +364,11 @@ function renderPlayerCard(name, group, isBoss) {
   return h + '</div></div>';
 }
 
-// ---------- 截图分享 ----------
-/**
- * 分享降级链（PC 端优先剪贴板）：
- *   1. 剪贴板写入 → Ctrl+V 粘贴到 QQ/微信（PC 端体验最佳）
- *   2. Web Share API → 系统原生分享面板（移动端）
- *   3. 下载图片 → 浏览器本地保存（终极兜底）
- *
- * 卡片分享：点击整张卡片触发（无独立按钮），_sharingCardId 防重入
- * 总体分享：点击总收入栏触发，_sharingAll 防重入
- */
+// 截图分享：降级链（剪贴板 → Web Share → 下载）
 var _sharingCardId = null;
-var _sharingAll = false;  // 总体分享防重入锁
+var _sharingAll = false;
 
-/**
- * 截图辅助：截图前临时清除 transform/box-shadow/filter
- * 避免 hover/active 态被固化进图片（如卡片 hover 时的位移、总收入栏 active 下沉）
- * 截图完成或失败后恢复原样
- */
+// 截图辅助：截图前临时清除 transform/box-shadow/filter，避免 hover/active 态被固化进图片
 function capture(el) {
   var targets = (el.classList.contains("player-card") || el.classList.contains("grand-total"))
     ? [el]
@@ -457,7 +394,7 @@ function capture(el) {
   );
 }
 
-// 总体分享：截取整个结算结果区（老板卡片 + 未归属 + 总收入）
+// 总体分享：截取整个结算结果区
 function shareAll() {
   if (_sharingAll) return;
   var result = document.getElementById("result");
@@ -480,7 +417,7 @@ function shareAll() {
   }).catch(function() { showToast("截图生成失败，请重试"); _sharingAll = false; });
 }
 
-// 主入口：点击整卡片触发 → 截图 → 按降级链分享
+// 卡片分享：点击整卡片触发截图分享
 function shareCard(id) {
   if (_sharingCardId) return;
   var card = document.getElementById("box-" + id);
@@ -491,12 +428,9 @@ function shareCard(id) {
   showToast("生成中...");
 
   var done = function() { _sharingCardId = null; };
-  // capture 会清除 hover/active 态，截图 → 转 Blob → 进入分享降级链
   capture(card).then(function(canvas) {
     canvas.toBlob(function(blob) {
       if (!blob) { showToast("生成图片失败"); done(); return; }
-
-      // 第 1 级：剪贴板（PC 端优先）
       if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
         navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
           .then(function() { showToast("已复制到剪贴板，Ctrl+V 粘贴到QQ即可"); done(); })
@@ -508,7 +442,7 @@ function shareCard(id) {
   }).catch(function() { showToast("生成图片失败"); done(); });
 }
 
-// 第 2 级降级：Web Share API（移动端系统分享）
+// 分享降级：Web Share API（移动端系统分享）
 function tryFallbackShare(blob, done) {
   if (navigator.share && navigator.canShare) {
     try {
@@ -519,12 +453,12 @@ function tryFallbackShare(blob, done) {
           .catch(function() { tryDownloadImage(blob, done); });
         return;
       }
-    } catch (e) { /* 部分浏览器 canShare 抛错，继续降级 */ }
+    } catch (e) { }
   }
   tryDownloadImage(blob, done);
 }
 
-// 第 3 级兜底：触发浏览器下载图片
+// 分享兜底：触发浏览器下载图片
 function tryDownloadImage(blob, done) {
   try {
     var url = URL.createObjectURL(blob);
@@ -534,7 +468,7 @@ function tryDownloadImage(blob, done) {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);  // 1 秒后释放内存
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
     showToast("图片已开始下载");
   } catch (e) {
     showToast("分享失败，请截图保存");
@@ -542,6 +476,7 @@ function tryDownloadImage(blob, done) {
   done();
 }
 
+// Toast 提示
 var toastTimer;
 function showToast(msg) {
   var el = document.getElementById("toast");

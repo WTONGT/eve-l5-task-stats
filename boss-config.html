@@ -86,31 +86,21 @@ body{background:var(--bg);min-height:100vh;font:14px/1.65 var(--font);color:var(
 <script>
 /**
  * 老板登记页面
- * 功能：管理「老板名 → 声望号名字列表」映射
- * 特性：
- *   - 卡片式独立编辑，单个保存
- *   - 乐观锁（expectV）防并发覆盖
- *   - 口令鉴权（BOSS_PASS，服务端校验）
- *   - 离线降级只读模式
+ * 管理老板名与声望号的映射关系
  */
 
-// ---------- API & 数据加载 ----------
+// API 地址
 var API = (function(){
   var host = location.host;
   if (host.indexOf("netlify.app") !== -1 || host.indexOf("localhost") !== -1) return "/.netlify/functions/config";
   return localStorage.getItem("eve_api_url") || "";
 })();
-var DEFAULT_CONFIG = {
-  taskPrices: {},
-  keyMap: {},
-  keyMapOrder: [],
-  taskPriceOrder: [],
-  bosses: {}
-};
-var config = { bosses: {} };
 
-// ---------- 口令门 ----------
-// 先向服务端验证口令，通过后才放行并加载数据
+// 默认配置
+var DEFAULT_CONFIG = { taskPrices: {}, keyMap: {}, keyMapOrder: [], taskPriceOrder: [], bosses: {} };
+
+// 全局状态
+var config = { bosses: {} };
 var BOSS_PASS = null;
 (function(){
   var input = document.getElementById("gateInput");
@@ -156,13 +146,8 @@ var BOSS_PASS = null;
   }
 })();
 
-/**
- * 已保存名字映射表（关键机制）
- * 作用：记录每个老板上次成功保存到服务端时的名字
- * 原因：render() 会重置 data-old-name 属性，导致多次重命名后
- *       无法追踪最初保存的名字，服务端无法清理旧 Blob
- * 用法：saveOne 时从 _savedNames 取 oldName，不受 render 影响
- */
+// 已保存名字映射表：记录每个老板上次成功保存到服务端时的名字
+// 原因：render() 会重置 data-old-name 属性，导致多次重命名后无法追踪最初保存的名字
 var _savedNames = {};
 
 // 加载配置：优先从服务端拉取，失败则降级到本地缓存（只读）
@@ -206,10 +191,10 @@ function setStatus(msg, cls) {
   el.className = "status status-" + cls;
 }
 
-// ---------- HTML 转义 ----------
+// HTML 转义，防 XSS
 function htmlEscape(s) { return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-// ---------- 渲染老板卡片 ----------
+// 渲染老板卡片
 function render() {
   var names = Object.keys(config.bosses).sort();
   var html = "";
@@ -243,13 +228,11 @@ function render() {
   document.getElementById("bosses").innerHTML = html;
 }
 
-// ---------- DOM 辅助函数 ----------
 // 向上查找最近的老板卡片元素
 function findBossCard(el) { while (el && !el.classList.contains("boss-card")) el = el.parentElement; return el; }
+
 // 从卡片 data-boss 属性取老板名
 function getBossName(card) { return card.getAttribute("data-boss"); }
-
-// ---------- 老板增删改（本地编辑，点保存才同步服务端） ----------
 
 // 新增空老板卡片（自动命名为"新老板N"）
 function addBoss() {
@@ -259,12 +242,7 @@ function addBoss() {
   render();
 }
 
-/**
- * 删除老板
- * 流程：先请求服务端 → 成功后才更新本地数据（防止本地删了但服务端没删）
- * 鉴权：x-boss-pass 请求头
- * 并发：expectV 乐观锁，冲突返回 409
- */
+// 删除老板：先请求服务端，成功后才更新本地数据（防止本地删了但服务端没删）
 function deleteBoss(btn) {
   var card = findBossCard(btn);
   var name = getBossName(card);

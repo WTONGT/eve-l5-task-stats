@@ -286,7 +286,7 @@ async function handlePost(store, request, corsHeaders) {
       // 更新索引（过滤掉被删除的名字）
       const indexRaw = await store.get(BOSSES_INDEX);
       const index = indexRaw ? JSON.parse(indexRaw) : [];
-      const newIndex = index.filter(function(n) { return n !== body.remove; });
+      const newIndex = index.filter((n) => n !== body.remove);
       await store.set(BOSSES_INDEX, JSON.stringify(newIndex));
 
       try { await store.delete(BOSS_PREFIX + body.remove); } catch (e) { console.error("delete boss blob failed:", e); }

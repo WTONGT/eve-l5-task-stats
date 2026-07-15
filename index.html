@@ -130,7 +130,7 @@ function fetchConfig() {
     .then(function(data) {
       if (data.unchanged) {
         var cached = localStorage.getItem("eve_config");
-        CONFIG = cached ? JSON.parse(cached) : { bosses:{}, taskPrices:{}, keyMap:{} };
+        CONFIG = cached ? JSON.parse(cached) : { bosses:{}, taskPrices:{}, keyMap:{}, keyMapOrder:[], taskPriceOrder:[] };
       } else {
         CONFIG = data;
         localStorage.setItem("eve_config", JSON.stringify(data));
@@ -253,12 +253,6 @@ function parseLine(line) {
   return { task: recognizeTask(taskName), location: location, time: timeStr, publisher: publisher };
 }
 
-// 兼容旧函数名（保留，可能被外部引用）
-function extractPublisherFallback(line) {
-  var idx = line.lastIndexOf(" - ");
-  return idx !== -1 ? line.substring(idx + 3).trim() : "未识别";
-}
-
 // 任务名模糊匹配：按 keyMapOrder 顺序匹配，长关键词优先
 function recognizeTask(rawName) {
   if (!_sortedKeysCache) {
@@ -323,18 +317,17 @@ function render(bossGroups, grandTotal, unrecognized) {
   }
 
   Object.keys(bossGroups).sort().forEach(function(name) {
-    html += renderPlayerCard(name, bossGroups[name], true);
+    html += renderPlayerCard(name, bossGroups[name]);
   });
   html += '<div class="grand-total" onclick="shareAll()">总收入：' + grandTotal + ' M</div>';
   document.getElementById("result").innerHTML = html;
 }
 
 // 渲染单个老板卡片
-function renderPlayerCard(name, group, isBoss) {
+function renderPlayerCard(name, group) {
   var safeId = name.replace(SAFE_ID_REGEX, "") + "-" + _cardIdCounter++;
-  var avatarBg = isBoss ? "" : ' style="background:#f5f0eb;color:#a09c96"';
   var h = '<div class="player-card" id="box-' + safeId + '" onclick="shareCard(\'' + safeId + '\')"><div class="player-header"><div class="player-info">';
-  h += '<div class="player-avatar"' + avatarBg + '>' + htmlEscape(isBoss ? name.charAt(0) : "?") + '</div>';
+  h += '<div class="player-avatar">' + htmlEscape(name.charAt(0)) + '</div>';
   h += '<div><div class="player-name">' + htmlEscape(name) + '</div><div class="player-meta">' + group.items.length + ' 个任务</div></div>';
   h += '</div><span class="player-total">' + group.total + ' M</span>';
   h += '</div><div class="task-items" id="list-' + safeId + '">';

@@ -170,7 +170,7 @@ function load() {
   p.then(function(data) {
       if (data.unchanged) {
         var cached = localStorage.getItem("eve_config");
-        config = cached ? JSON.parse(cached) : { bosses:{}, taskPrices:{}, keyMap:{} };
+        config = cached ? JSON.parse(cached) : { bosses:{}, taskPrices:{}, keyMap:{}, keyMapOrder:[], taskPriceOrder:[] };
       } else {
         config = data;
         localStorage.setItem("eve_config", JSON.stringify(data));

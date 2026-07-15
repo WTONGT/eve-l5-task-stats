@@ -158,7 +158,7 @@ function load() {
       if (data.unchanged) {
         // 版本未变，复用本地缓存
         var cached = localStorage.getItem("eve_config");
-        config = cached ? JSON.parse(cached) : { bosses: {} };
+        config = cached ? JSON.parse(cached) : { bosses:{}, taskPrices:{}, keyMap:{}, keyMapOrder:[], taskPriceOrder:[] };
       } else {
         // 版本变更，更新本地缓存
         config = data;

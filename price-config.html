@@ -109,6 +109,17 @@ body{background:var(--bg);min-height:100vh;font:14px/1.65 var(--font);color:var(
  * 鉴权：ADMIN_PASS 环境变量，x-admin-pass 请求头
  */
 
+// ---------- 数据加载 ----------
+var API = (function(){
+  var host = location.host;
+  if (host.indexOf("netlify.app") !== -1 || host.indexOf("localhost") !== -1) return "/.netlify/functions/config";
+  return localStorage.getItem("eve_api_url") || "";
+})();
+var config = null;
+var currentTab = "prices";
+var dragSrc = null;
+var offlineMode = false;
+
 // ---------- 口令门 ----------
 // 先向服务端验证口令，通过后才放行并加载数据
 var ADMIN_PASS = null;
@@ -155,17 +166,6 @@ var ADMIN_PASS = null;
     load();
   }
 })();
-
-// ---------- 数据加载 ----------
-var API = (function(){
-  var host = location.host;
-  if (host.indexOf("netlify.app") !== -1 || host.indexOf("localhost") !== -1) return "/.netlify/functions/config";
-  return localStorage.getItem("eve_api_url") || "";
-})();
-var config = null;
-var currentTab = "prices";
-var dragSrc = null;
-var offlineMode = false;
 
 function load() {
   var ver = parseInt(localStorage.getItem("eve_config_version"), 10) || 0;

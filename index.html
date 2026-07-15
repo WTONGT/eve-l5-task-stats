@@ -166,10 +166,14 @@ function renderPriceGrid() {
     : Object.keys(CONFIG.taskPrices).sort();
   grid.innerHTML = names.map(function(name) {
     var price = CONFIG.taskPrices[name];
-    // 转义单引号，防止破坏 onclick 字符串（任务名通常为中文，此为防御性处理）
-    var nameJs = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-    return '<div class="price-tag' + (price === 0 ? ' free' : '') + '" onclick="copyTaskName(\'' + nameJs + '\')"><span>' + htmlEscape(name) + '</span><span>' + htmlEscape(price) + 'M</span></div>';
+    return '<div class="price-tag' + (price === 0 ? ' free' : '') + '" data-task="' + htmlEscape(name) + '"><span>' + htmlEscape(name) + '</span><span>' + htmlEscape(price) + 'M</span></div>';
   }).join("");
+  // 事件绑定：从 data-task 读取任务名，避免内联 onclick 的 XSS 风险
+  grid.querySelectorAll(".price-tag[data-task]").forEach(function(el) {
+    el.addEventListener("click", function() {
+      copyTaskName(this.getAttribute("data-task"));
+    });
+  });
 }
 
 // ---------- 文本复制 ----------

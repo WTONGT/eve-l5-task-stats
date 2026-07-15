@@ -94,6 +94,14 @@ body{background:var(--bg);min-height:100vh;font:14px/1.65 var(--font);color:var(
  *   - 离线降级只读模式
  */
 
+// ---------- API & 数据加载 ----------
+var API = (function(){
+  var host = location.host;
+  if (host.indexOf("netlify.app") !== -1 || host.indexOf("localhost") !== -1) return "/.netlify/functions/config";
+  return localStorage.getItem("eve_api_url") || "";
+})();
+var config = { bosses: {} };
+
 // ---------- 口令门 ----------
 // 先向服务端验证口令，通过后才放行并加载数据
 var BOSS_PASS = null;
@@ -140,14 +148,6 @@ var BOSS_PASS = null;
     load();
   }
 })();
-
-// ---------- API & 数据加载 ----------
-var API = (function(){
-  var host = location.host;
-  if (host.indexOf("netlify.app") !== -1 || host.indexOf("localhost") !== -1) return "/.netlify/functions/config";
-  return localStorage.getItem("eve_api_url") || "";
-})();
-var config = { bosses: {} };
 
 /**
  * 已保存名字映射表（关键机制）
